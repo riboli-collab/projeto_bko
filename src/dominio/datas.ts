@@ -15,5 +15,22 @@ export function dataDoDesign(d: Date): string {
 }
 
 export function dataHoraDoDesign(d: Date): string {
-  return `${dataDoDesign(d)} ${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`
+  return `${dataDoDesign(d)} ${horaDoDesign(d)}`
+}
+
+/** Só a hora, `08:14` — é o que o resumo do painel mostra em "atualizado às". */
+export function horaDoDesign(d: Date): string {
+  return `${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`
+}
+
+/**
+ * Dia e mês de uma data que veio como `YYYY-MM-DD`, sem passar por `Date`.
+ *
+ * `new Date('2026-08-13')` é meia-noite **UTC**; em Chapecó isso é 21h do dia
+ * 12, e a portabilidade de amanhã aparece como sendo de hoje. O bug não dá
+ * erro: só mostra a data errada para quem vai ligar para o cliente.
+ */
+export function diaMesDoDesign(iso: string): string {
+  const [, mes, dia] = iso.split('-')
+  return `${dia}/${mes}`
 }

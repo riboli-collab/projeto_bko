@@ -12,6 +12,7 @@ import { compararComABase, valoresDaBase, type DivergenciaDeCadastro } from '@/d
 import { registrarDivergencias } from '@/app/acoes/divergencias'
 import { anexarDocumento, removerAnexo } from '@/app/acoes/documentos'
 import type { DocumentoId } from '@/dominio/documentos'
+import { dataHoraDoDesign } from '@/dominio/datas'
 import type { Operadora } from '@/dominio/tipos'
 
 const ENDERECO_VAZIO = {
@@ -216,7 +217,7 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
           setCamposFaltantes({})
           setResultado({ numero: r.numero, responsavel: r.responsavel,
             situacaoRotulo: 'PEDIDO DO COMERCIAL', prazoRotulo: '4 horas',
-            enviadoEm: new Date().toISOString() })
+            enviadoEm: dataHoraDoDesign(new Date()) })
         } else {
           // Todos os erros de uma vez, nunca só o primeiro, e nada do que já
           // foi digitado se perde: o rascunho não é tocado aqui.

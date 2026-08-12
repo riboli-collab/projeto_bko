@@ -2,7 +2,7 @@ import { listarPedidos, FILTROS_VAZIOS, type PedidoDaLista } from './lista'
 import { db } from '@/db/cliente'
 import { pedidos } from '@/db/schema'
 import { situacao } from '@/dominio/situacoes'
-import { dataDoDesign } from '@/dominio/datas'
+import { dataDoDesign, diaMesDoDesign, horaDoDesign } from '@/dominio/datas'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
 import type { SituacaoId } from '@/dominio/tipos'
 
@@ -13,8 +13,7 @@ const MAX_POR_CARTAO = 5
 
 const reais = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const ddmm = (iso: string) =>
-  new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+const ddmm = diaMesDoDesign
 const hora = (iso: string) =>
   new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 /**
@@ -109,7 +108,7 @@ export async function montarPainel(hoje = new Date()) {
       dataPorExtenso: hoje.toLocaleDateString('pt-BR', {
         weekday: 'long', day: 'numeric', month: 'long',
       }),
-      atualizadoEm: hoje.toISOString(),
+      atualizadoEm: horaDoDesign(hoje),
     },
   }
 }
