@@ -3,6 +3,7 @@ import { db } from '@/db/cliente'
 import { pedidos, clientes } from '@/db/schema'
 import { SITUACOES, situacao } from '@/dominio/situacoes'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
+import { dataDoDesign, dataHoraDoDesign } from '@/dominio/datas'
 import type {
   SituacaoId, Operadora, EmpresaFaturadora, TipoDePedido, EstadoDoPrazo,
 } from '@/dominio/tipos'
@@ -99,8 +100,8 @@ export async function listarPedidos(f: FiltrosAtivos): Promise<DadosDaLista> {
       estadoDoPrazo: estadoDoPrazo({
         situacaoId, diasParados, dataPortabilidade: p.dataPortabilidade, hoje: agora,
       }),
-      dataEntrada: p.dataEntrada.toISOString(),
-      dataSituacao: p.dataSituacao.toISOString(),
+      dataEntrada: dataDoDesign(p.dataEntrada),
+      dataSituacao: dataDoDesign(p.dataSituacao),
       dataPortabilidade: p.dataPortabilidade,
       valorVenda: Number(p.precoVenda) * p.qtdLinhas,
       vendedor: p.vendedor,
@@ -129,7 +130,7 @@ export async function listarPedidos(f: FiltrosAtivos): Promise<DadosDaLista> {
     resumo: {
       totalEmAberto: emAberto.length,
       totalEstourados: emAberto.filter((p) => p.estadoDoPrazo === 'estourado').length,
-      atualizadoEm: agora.toISOString(),
+      atualizadoEm: dataHoraDoDesign(agora),
     },
   }
 }

@@ -32,7 +32,7 @@ export function LinhaDoTempo({ historico, situacoes }: LinhaDoTempoProps) {
         </span>
       </header>
 
-      <ol className="flex flex-col px-4 py-4">
+      <ol data-testid="historico" className="flex flex-col px-4 py-4">
         {historico.map((item, indice) => {
           const ultimo = indice === historico.length - 1
 

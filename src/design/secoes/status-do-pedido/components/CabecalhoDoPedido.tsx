@@ -33,6 +33,7 @@ export function CabecalhoDoPedido({ pedido, situacao, onVoltarParaLista }: Cabec
               {pedido.numero}
             </h1>
             <span
+              data-testid="situacao-atual"
               className={`rounded px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${prazo.capsula}`}
             >
               {situacao.rotulo}
@@ -48,6 +49,7 @@ export function CabecalhoDoPedido({ pedido, situacao, onVoltarParaLista }: Cabec
             <p className={MICRO_ROTULO}>Parado há</p>
             <p className="mt-0.5 flex items-baseline justify-end gap-1">
               <span
+                data-testid="dias-parados"
                 className={`text-2xl font-semibold tabular-nums ${prazo.texto}`}
                 style={{ fontFamily: MONO }}
               >
