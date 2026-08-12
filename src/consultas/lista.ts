@@ -23,6 +23,11 @@ export interface PedidoDaLista {
   diasParados: number
   estadoDoPrazo: EstadoDoPrazo
   dataEntrada: string
+  /**
+   * O instante exato da entrada, em ISO. `dataEntrada` é só a data, no formato
+   * que o componente exibe — o painel precisa da hora para dizer "chegou às 07:42".
+   */
+  entradaEm: string
   dataSituacao: string
   dataPortabilidade: string | null
   valorVenda: number
@@ -101,6 +106,7 @@ export async function listarPedidos(f: FiltrosAtivos): Promise<DadosDaLista> {
         situacaoId, diasParados, dataPortabilidade: p.dataPortabilidade, hoje: agora,
       }),
       dataEntrada: dataDoDesign(p.dataEntrada),
+      entradaEm: p.dataEntrada.toISOString(),
       dataSituacao: dataDoDesign(p.dataSituacao),
       dataPortabilidade: p.dataPortabilidade,
       valorVenda: Number(p.precoVenda) * p.qtdLinhas,
