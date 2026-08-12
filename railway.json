@@ -6,7 +6,7 @@
   "deploy": {
     "preDeployCommand": "npm run migrar",
     "startCommand": "npm run start",
-    "healthcheckPath": "/painel",
+    "healthcheckPath": "/saude",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3

@@ -71,7 +71,23 @@ social, RG e comprovante de residência, que nunca entram no repositório.
 - Todas as páginas são `force-dynamic`. O layout raiz consulta o banco para o
   contador da barra lateral, então nada sob ele pode ser pré-gerado.
 
+## Acesso
+
+Há uma senha única de equipe, em `SENHA_DE_ACESSO`. Sem a variável definida a
+Esteira fica aberta — é o que permite rodar local sem cerimônia; com ela, toda
+rota passa por `src/proxy.ts`, menos `/entrar` e `/saude`.
+
+O cookie guarda `validade.assinatura`, nunca a senha: a assinatura é HMAC-SHA256
+com a própria senha como chave, então trocá-la derruba todas as sessões
+abertas. Dura oito horas — um turno.
+
+`/saude` fica fora da tranca de propósito. É por onde o Railway pergunta se o
+app subiu, e ele não digita senha: protegendo, todo deploy seria reprovado no
+healthcheck e revertido, com a aplicação funcionando.
+
 ## O que ainda não existe
 
-Autenticação. Quem abre a URL entra, e o autor das transições é uma constante
-(`QUEM = 'Carlos'`). Está previsto, e até lá a URL não deve circular.
+**Autenticação por pessoa.** A senha protege o acesso, mas não identifica quem
+mexeu: o autor das transições continua sendo a constante `QUEM = 'Carlos'` no
+adaptador. Enquanto for assim, o histórico registra *quando* e *o quê*, não
+*quem* — e é o *quem* que torna o checklist auditável.

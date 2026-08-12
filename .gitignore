@@ -48,3 +48,6 @@ armazenamento/
 # Artefatos do Playwright — resultado de execução, não fonte.
 test-results/
 playwright-report/
+
+# Sessão autenticada dos testes — gerada, não fonte.
+testes/.sessao.json
