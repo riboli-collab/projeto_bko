@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { StatusDoPedido } from '@/design/secoes/status-do-pedido/components'
+import { ResumoDaCobranca } from './ResumoDaCobranca'
 import { mudarSituacao } from '@/app/acoes/mudar-situacao'
 import { abrirPendencia, responderPendencia } from '@/app/acoes/pendencias'
 import type { DadosDoStatus } from '@/consultas/pedido'
@@ -25,22 +26,34 @@ export function TelaStatus({ dados }: { dados: DadosDoStatus }) {
     })
 
   return (
-    <StatusDoPedido
-      pedido={dados.pedido}
-      situacoes={dados.situacoes}
-      historico={dados.historico}
-      pendencias={dados.pendencias}
-      transicoes={dados.transicoes}
-      pessoas={dados.pessoas}
-      isLoading={gravando}
-      erro={erro}
-      onMudarSituacao={(id: SituacaoId, motivo: string) =>
-        executar(() => mudarSituacao(dados.pedido.numero, id, motivo, QUEM))}
-      onAbrirPendencia={(pergunta, dono) =>
-        executar(() => abrirPendencia(dados.pedido.numero, pergunta, dono, QUEM))}
-      onResponderPendencia={(id, resposta, ehRegra) =>
-        executar(() => responderPendencia(Number(id), resposta, ehRegra, QUEM))}
-      onVoltarParaLista={() => router.push('/pedidos')}
-    />
+    <>
+      <StatusDoPedido
+        pedido={dados.pedido}
+        situacoes={dados.situacoes}
+        historico={dados.historico}
+        pendencias={dados.pendencias}
+        transicoes={dados.transicoes}
+        pessoas={dados.pessoas}
+        isLoading={gravando}
+        erro={erro}
+        onMudarSituacao={(id: SituacaoId, motivo: string) =>
+          executar(() => mudarSituacao(dados.pedido.numero, id, motivo, QUEM))}
+        onAbrirPendencia={(pergunta, dono) =>
+          executar(() => abrirPendencia(dados.pedido.numero, pergunta, dono, QUEM))}
+        onResponderPendencia={(id, resposta, ehRegra) =>
+          executar(() => responderPendencia(Number(id), resposta, ehRegra, QUEM))}
+        onVoltarParaLista={() => router.push('/pedidos')}
+      />
+
+      {/* A ficha mostra o preço por linha; o que o cliente paga na fatura é isto.
+          Sem este bloco, `valorDoChip` era gravado no banco e nunca lido em lugar nenhum. */}
+      <div className="mx-auto max-w-[1400px] px-4 pb-6 sm:px-6 lg:px-8">
+        {/* Mesma grade do StatusDoPedido: o cartão fica na coluna dos dados do
+            pedido, e não atravessado sob a coluna do histórico. */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-5">
+          <ResumoDaCobranca cobranca={dados.cobranca} />
+        </div>
+      </div>
+    </>
   )
 }

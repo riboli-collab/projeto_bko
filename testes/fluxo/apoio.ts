@@ -37,7 +37,10 @@ export async function limparPedidosDeTeste() {
  * criou pela tela: rodando em paralelo, quem limpa a base derruba o vizinho, e
  * a falha aparece longe da causa. Aqui o dado é explícito e igual toda vez.
  */
-export async function criarPedidoNoBanco(numero = 'PED-2026-0001') {
+export async function criarPedidoNoBanco(
+  numero = 'PED-2026-0001',
+  { precoVenda = 49.9, valorDoChip = 0, qtdLinhas = 4 } = {},
+) {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
   await sql`
     insert into clientes (cnpj_cpf, tipo, razao_social, contato, email_financeiro)
@@ -50,7 +53,7 @@ export async function criarPedidoNoBanco(numero = 'PED-2026-0001') {
       tipo_de_chip, vendedor, data_entrada, data_situacao
     ) values (
       ${numero}, ${CNPJ_DE_TESTE}, 'PEDIDO_DO_COMERCIAL', 'Gabrielle Souza', 'Vivo', 'IG',
-      'IG', 'vivo-ilimitado-6-gb', 4, 49.90, 0, 'Linha nova',
+      'IG', 'vivo-ilimitado-6-gb', ${qtdLinhas}, ${precoVenda}, ${valorDoChip}, 'Linha nova',
       'eSIM', 'Carlos', now(), now()
     ) on conflict (numero) do nothing`
   await sql`
@@ -74,6 +77,39 @@ export async function criarClienteIncompleto(razaoSocial = 'Comércio Antigo Ltd
       razao_social = excluded.razao_social,
       contato = excluded.contato,
       contato_incompleto = true`
+  await sql.end()
+}
+
+/**
+ * Um cliente com o cadastro inteiro preenchido — os 18 de 1.126 que vieram assim.
+ *
+ * O nome é propositalmente improvável: a base de desenvolvimento tem os
+ * clientes de verdade carregados, e um teste de busca por nome que casasse com
+ * eles passaria a depender de dado real para continuar verde.
+ */
+export const NOME_DE_TESTE = 'Zebra Telecomunicações Fictícia Ltda'
+
+export async function criarClienteCompleto() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  await sql`
+    insert into clientes (
+      cnpj_cpf, tipo, razao_social, contato, contato_incompleto,
+      email_financeiro, email_assinatura, telefone, endereco_fiscal
+    ) values (
+      ${CNPJ_DE_TESTE}, 'PJ', ${NOME_DE_TESTE}, 'Fernando Ribeiro', false,
+      'financeiro@exemplo.com.br', 'assina@exemplo.com.br', '(49) 98888-7777',
+      ${sql.json({
+        logradouro: 'Rua das Palmeiras', numero: '120', complemento: '',
+        bairro: 'Centro', cidade: 'Chapecó', estado: 'SC', cep: '89801-000',
+      })}
+    )
+    on conflict (cnpj_cpf) do update set
+      razao_social = excluded.razao_social,
+      contato = excluded.contato,
+      contato_incompleto = false,
+      email_assinatura = excluded.email_assinatura,
+      telefone = excluded.telefone,
+      endereco_fiscal = excluded.endereco_fiscal`
   await sql.end()
 }
 
@@ -119,13 +155,15 @@ export async function preencherPedido(
   page: Page,
   opcoes: {
     operadora?: string; plano?: string; valor?: string; empresa?: string | null
+    /** Valor do chip. Vai com ponto, pelo mesmo motivo do preço. */
+    chip?: string
     /** Anexa os dois obrigatórios do CNPJ. Sem eles o pedido não é criado (RN4). */
     anexos?: boolean
   } = {},
 ) {
   const {
     operadora = 'Claro', plano = 'ilimitado 1 GB', valor = '49.90', empresa = 'IG',
-    anexos = true,
+    chip = '0', anexos = true,
   } = opcoes
 
   await page.locator('#campo-cnpjCpf').fill(CNPJ_DE_TESTE)
@@ -141,7 +179,7 @@ export async function preencherPedido(
   await page.locator('#campo-operadora').selectOption({ label: operadora })
   await page.locator('#campo-plano').selectOption({ label: plano })
   await page.locator('#campo-precoVenda').fill(valor)
-  await page.locator('#campo-valorDoChip').fill('0')
+  await page.locator('#campo-valorDoChip').fill(chip)
 
   if (empresa !== null) {
     await page.getByRole('radiogroup', { name: 'Empresa faturadora' })

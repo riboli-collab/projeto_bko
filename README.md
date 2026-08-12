@@ -29,7 +29,7 @@ planos, que é dado de negócio, use `npx tsx scripts/carregar-planos.ts`.
 ## Como verificar
 
 ```bash
-npm run verificar             # 133 testes de unidade + 43 de fluxo
+npm run verificar             # 156 testes de unidade + 61 de fluxo
 ```
 
 Os testes de fluxo sobem o app na porta 3100 e rodam contra o Postgres de
@@ -49,7 +49,7 @@ Leitura passa por `src/consultas/`; escrita, por Server Actions em
 um **valor** de `src/consultas/` para um Client Component arrasta o driver do
 Postgres para o navegador.
 
-## Duas coisas que parecem detalhe e não são
+## Quatro coisas que parecem detalhe e não são
 
 **A empresa faturadora nunca é deduzida.** A relação com a operadora existe e é
 estável, e ainda assim o campo é digitado: deduzir apaga a declaração que o BKO
@@ -59,6 +59,18 @@ confere (DEC-2026-04). Há um teste que falha se alguém "melhorar" isso.
 Mandar `toISOString()` não dá erro nenhum — só escreve `2026-08-12T22:13:10.006Z`
 na tela. `src/dominio/datas.ts` tem os formatadores, e um teste os tranca contra
 o `sample-data` do pacote de design.
+
+**`valorVenda` quer dizer duas coisas diferentes.** Na ficha do pedido é o preço
+**por linha** — o componente escreve "por linha" ao lado, e o `sample-data` da
+seção traz 62,90 com 8 linhas. Na fila é o **total** do pedido: 1.259,86 com 14
+linhas. Mesmo nome, duas seções do mesmo pacote. `src/consultas/pedido.ts`
+multiplicava, e a ficha dizia que a linha custava oito vezes o que custa.
+
+**O chip é cobrado uma vez; o plano, todo mês.** Somar os dois num "valor do
+pedido" faz quem projeta receita mensal carregar o valor de todos os chips para
+sempre. `src/dominio/cobranca.ts` devolve os dois separados, e é ele que a
+Entrada e a ficha mostram. `eSIM` **não** zera o chip por dedução: quem decide se
+houve custo de ativação é quem vendeu, e zero digitado é cortesia declarada.
 
 ## Produção
 
@@ -91,3 +103,14 @@ healthcheck e revertido, com a aplicação funcionando.
 mexeu: o autor das transições continua sendo a constante `QUEM = 'Carlos'` no
 adaptador. Enquanto for assim, o histórico registra *quando* e *o quê*, não
 *quem* — e é o *quem* que torna o checklist auditável.
+
+**A busca por nome e o resumo da cobrança moram fora do design.**
+`src/telas/LocalizarCliente.tsx` e `src/telas/ResumoDaCobranca.tsx` são compostos
+por fora do pacote porque `src/design/` é cópia intocada. Eles usam os tokens do
+próprio design, mas o lugar certo é dentro da Entrada e da ficha — o que exige
+redesenhar as seções e reexportar.
+
+**A cópia do design está atrás do projeto de design em contraste.** O
+`MICRO_ROTULO` de `src/design/` ainda é `text-slate-400 dark:text-slate-500`
+(2,6:1 no claro, reprovado); `esteira-design/` já foi corrigido para
+`text-slate-500 dark:text-slate-400`. A correção chega quando o export rodar.

@@ -9,11 +9,15 @@ import { responsavelPor } from '@/dominio/roteamento'
 import { avaliarPreco, type CustoDoPlano } from '@/dominio/preco'
 import { validarPedido, type CampoId } from '@/dominio/validacao-do-pedido'
 import { compararComABase, valoresDaBase, type DivergenciaDeCadastro } from '@/dominio/divergencias'
+import { preencherComOCadastro, type CadastroDoCliente } from '@/dominio/cadastro'
+import { calcularCobranca, cobrancaCalculavel } from '@/dominio/cobranca'
 import { registrarDivergencias } from '@/app/acoes/divergencias'
 import { anexarDocumento, removerAnexo } from '@/app/acoes/documentos'
 import type { DocumentoId } from '@/dominio/documentos'
 import { dataHoraDoDesign } from '@/dominio/datas'
 import type { Operadora } from '@/dominio/tipos'
+import { LocalizarCliente } from './LocalizarCliente'
+import { ResumoDaCobranca } from './ResumoDaCobranca'
 
 const ENDERECO_VAZIO = {
   logradouro: '', numero: '', complemento: '',
@@ -114,6 +118,38 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
     [plano, rascunho.precoVenda],
   )
 
+  // O chip entra na primeira fatura e some depois; o plano recorre. Somar os
+  // dois num número só é o que a regra proíbe — ver `dominio/cobranca.ts`.
+  const cobranca = useMemo(
+    () => calcularCobranca(rascunho),
+    [rascunho.precoVenda, rascunho.valorDoChip, rascunho.qtdLinhas],
+  )
+
+  /**
+   * Traz o cadastro da base e o derrama no rascunho.
+   *
+   * É o mesmo caminho para as duas entradas — o CNPJ digitado no campo 1 e o
+   * cliente escolhido pelo nome. Uma função só porque são a mesma coisa: o que
+   * a base tem passa a valer, e o que ela não tem continua sendo digitado.
+   */
+  function carregarCadastro(doc: string, qtdLinhas: number | null) {
+    setResultadoDaBusca('buscando')
+    iniciar(async () => {
+      const c = await buscarClienteAction(doc)
+      setClienteEncontrado(c)
+      setResultadoDaBusca(c ? 'encontrado' : 'nao-encontrado')
+      if (!c) return
+
+      // A tela promete, em BuscaDeCliente.tsx, que "nome, endereço fiscal,
+      // contato, telefone e os dois e-mails vieram do cadastro". Preencher só
+      // três deles fazia a frase mentir sobre os outros três.
+      const { valores } = preencherComOCadastro(c as CadastroDoCliente)
+      setRascunho((r: any) => ({ ...r, ...valores }))
+
+      if (qtdLinhas && qtdLinhas > 0) setAviso(await acharDuplicidade(doc, qtdLinhas))
+    })
+  }
+
   function aoMudar(novo: any) {
     // Motoboy e Correios pedem endereço: o objeto precisa existir para os campos
     // existirem. Isto não é deduzir valor — é abrir o formulário certo.
@@ -134,16 +170,7 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
     const doc = String(novo.cnpjCpf ?? '').replace(/\D/g, '')
     const docAnterior = String(rascunho.cnpjCpf ?? '').replace(/\D/g, '')
     if (doc !== docAnterior && (doc.length === 11 || doc.length === 14)) {
-      setResultadoDaBusca('buscando')
-      iniciar(async () => {
-        const c = await buscarClienteAction(doc)
-        setClienteEncontrado(c)
-        setResultadoDaBusca(c ? 'encontrado' : 'nao-encontrado')
-        if (c) setRascunho((r: any) => ({
-          ...r, razaoSocial: c.razaoSocial, contato: c.contato,
-          emailFinanceiro: c.emailFinanceiro,
-        }))
-      })
+      carregarCadastro(doc, novo.qtdLinhas)
     }
 
     if (doc.length >= 11 && novo.qtdLinhas > 0) {
@@ -151,80 +178,111 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
     }
   }
 
+  // Enviado o pedido, o componente troca o formulário inteiro pela confirmação.
+  // Deixar os dois blocos na tela mostraria a cobrança de um rascunho que já virou pedido.
+  const emEdicao = !resultadoDoEnvio
+
   return (
-    <EntradaDoPedido
-      modo="criacao"
-      rascunho={rascunho}
-      opcoes={opcoes as any}
-      resultadoDaBusca={
-        clienteEncontrado && divergencias.length > 0 ? 'divergente' : resultadoDaBusca
-      }
-      clienteEncontrado={clienteEncontrado}
-      divergencias={divergencias}
-      onRegistrarDivergencia={(lista) => {
-        // O botão diz "registrar **e seguir com o da base**". As duas coisas:
-        // a divergência vira registro para alguém decidir depois, e o rascunho
-        // passa a valer o que a base guarda — senão a tela mostraria o digitado
-        // e o pedido nasceria com ele, que é justamente o que a regra recusa.
-        setRascunho((r: any) => ({ ...r, ...valoresDaBase(lista) }))
-        iniciar(async () => { await registrarDivergencias(rascunho.cnpjCpf, lista, QUEM) })
-      }}
-      // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
-      camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
-      bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}
-      anexos={anexos}
-      onAnexar={(documentoId, arquivo) => iniciar(async () => {
-        const dados = new FormData()
-        dados.set('rascunhoId', rascunhoId)
-        dados.set('documentoId', documentoId)
-        dados.set('quem', QUEM)
-        dados.set('arquivo', arquivo)
-        const r = await anexarDocumento(dados)
-        if (r.ok) {
-          setAnexos((atual) => [...atual.filter((a) => a.documentoId !== documentoId), r.anexo])
-          setErro(null)
-        } else {
-          setErro(r.motivo)
+    <>
+      {emEdicao && (
+        <div className="mx-auto max-w-4xl px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+          <LocalizarCliente
+            ocupado={enviando}
+            escolhido={clienteEncontrado?.razaoSocial ?? null}
+            onEscolher={(doc) => {
+              setRascunho((r: any) => ({ ...r, cnpjCpf: doc }))
+              carregarCadastro(doc, rascunho.qtdLinhas)
+            }}
+          />
+        </div>
+      )}
+
+      {/* Gruda no topo: os campos de preço estão no meio do formulário, e um
+          resumo que sai da tela ao rolar não confere nada. */}
+      {emEdicao && cobrancaCalculavel(rascunho) && (
+        <div className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur dark:bg-slate-900/95">
+          {/* `pb-3`: sem faixa embaixo, o formulário rola colado na borda do
+              cartão e a linha de ajuda que passa por trás aparece cortada ao meio. */}
+          <div className="mx-auto max-w-4xl px-4 pb-3 pt-4 sm:px-6 sm:pt-6 lg:px-8 lg:pt-8">
+            <ResumoDaCobranca cobranca={cobranca} />
+          </div>
+        </div>
+      )}
+
+      <EntradaDoPedido
+        modo="criacao"
+        rascunho={rascunho}
+        opcoes={opcoes as any}
+        resultadoDaBusca={
+          clienteEncontrado && divergencias.length > 0 ? 'divergente' : resultadoDaBusca
         }
-      })}
-      onRemoverAnexo={(documentoId) => iniciar(async () => {
-        await removerAnexo(rascunhoId, documentoId)
-        setAnexos((atual) => atual.filter((a) => a.documentoId !== documentoId))
-      })}
-      avisoDeDuplicidade={avisoDeDuplicidade}
-      responsavelPrevisto={responsavelPrevisto}
-      resultadoDoEnvio={resultadoDoEnvio}
-      isEnviando={enviando}
-      erro={erro}
-      onRascunhoChange={aoMudar}
-      onIgnorarDuplicidade={() => setAviso(null)}
-      onAbrirPedidoExistente={(numero) => router.push(`/pedidos/${numero}`)}
-      onEnviar={() => iniciar(async () => {
-        // D3: o componente chama o campo de `tipoDeAcao`; o domínio e o banco
-        // chamam de `tipo`. A tradução mora aqui, no adaptador — que é a única
-        // camada que conhece os dois vocabulários.
-        const r = await criarPedido({
-          ...rascunho,
-          rascunhoId,
-          tipo: rascunho.tipoDeAcao,
-          // `vendedor` está no modelo do PRD e NÃO existe no formulário
-          // desenhado — não é um dos 17 campos. Até haver decisão, ele é quem
-          // preencheu: é a única resposta que não inventa nome de vendedor.
-          // A Tarefa 22 troca a constante pelo seletor de pessoa.
-          vendedor: QUEM,
-        })
-        if (r.ok) {
-          setCamposFaltantes({})
-          setResultado({ numero: r.numero, responsavel: r.responsavel,
-            situacaoRotulo: 'PEDIDO DO COMERCIAL', prazoRotulo: '4 horas',
-            enviadoEm: dataHoraDoDesign(new Date()) })
-        } else {
-          // Todos os erros de uma vez, nunca só o primeiro, e nada do que já
-          // foi digitado se perde: o rascunho não é tocado aqui.
-          setCamposFaltantes(r.erros)
-          setErro(null)
-        }
-      })}
-    />
+        clienteEncontrado={clienteEncontrado}
+        divergencias={divergencias}
+        onRegistrarDivergencia={(lista) => {
+          // O botão diz "registrar **e seguir com o da base**". As duas coisas:
+          // a divergência vira registro para alguém decidir depois, e o rascunho
+          // passa a valer o que a base guarda — senão a tela mostraria o digitado
+          // e o pedido nasceria com ele, que é justamente o que a regra recusa.
+          setRascunho((r: any) => ({ ...r, ...valoresDaBase(lista) }))
+          iniciar(async () => { await registrarDivergencias(rascunho.cnpjCpf, lista, QUEM) })
+        }}
+        // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
+        camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
+        bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}
+        anexos={anexos}
+        onAnexar={(documentoId, arquivo) => iniciar(async () => {
+          const dados = new FormData()
+          dados.set('rascunhoId', rascunhoId)
+          dados.set('documentoId', documentoId)
+          dados.set('quem', QUEM)
+          dados.set('arquivo', arquivo)
+          const r = await anexarDocumento(dados)
+          if (r.ok) {
+            setAnexos((atual) => [...atual.filter((a) => a.documentoId !== documentoId), r.anexo])
+            setErro(null)
+          } else {
+            setErro(r.motivo)
+          }
+        })}
+        onRemoverAnexo={(documentoId) => iniciar(async () => {
+          await removerAnexo(rascunhoId, documentoId)
+          setAnexos((atual) => atual.filter((a) => a.documentoId !== documentoId))
+        })}
+        avisoDeDuplicidade={avisoDeDuplicidade}
+        responsavelPrevisto={responsavelPrevisto}
+        resultadoDoEnvio={resultadoDoEnvio}
+        isEnviando={enviando}
+        erro={erro}
+        onRascunhoChange={aoMudar}
+        onIgnorarDuplicidade={() => setAviso(null)}
+        onAbrirPedidoExistente={(numero) => router.push(`/pedidos/${numero}`)}
+        onEnviar={() => iniciar(async () => {
+          // D3: o componente chama o campo de `tipoDeAcao`; o domínio e o banco
+          // chamam de `tipo`. A tradução mora aqui, no adaptador — que é a única
+          // camada que conhece os dois vocabulários.
+          const r = await criarPedido({
+            ...rascunho,
+            rascunhoId,
+            tipo: rascunho.tipoDeAcao,
+            // `vendedor` está no modelo do PRD e NÃO existe no formulário
+            // desenhado — não é um dos 17 campos. Até haver decisão, ele é quem
+            // preencheu: é a única resposta que não inventa nome de vendedor.
+            // A Tarefa 22 troca a constante pelo seletor de pessoa.
+            vendedor: QUEM,
+          })
+          if (r.ok) {
+            setCamposFaltantes({})
+            setResultado({ numero: r.numero, responsavel: r.responsavel,
+              situacaoRotulo: 'PEDIDO DO COMERCIAL', prazoRotulo: '4 horas',
+              enviadoEm: dataHoraDoDesign(new Date()) })
+          } else {
+            // Todos os erros de uma vez, nunca só o primeiro, e nada do que já
+            // foi digitado se perde: o rascunho não é tocado aqui.
+            setCamposFaltantes(r.erros)
+            setErro(null)
+          }
+        })}
+      />
+    </>
   )
 }

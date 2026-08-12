@@ -5,6 +5,7 @@ import { situacao, SITUACOES, formaDeEntregaExibida } from '@/dominio/situacoes'
 import { formatarEndereco } from '@/dominio/endereco'
 import { dataDoDesign, dataHoraDoDesign } from '@/dominio/datas'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
+import { calcularCobranca } from '@/dominio/cobranca'
 import { transicoesDisponiveis } from '@/dominio/maquina-de-estados'
 import type {
   SituacaoId, TipoDePedido, TipoDeChip, FormaDeEntrega, Operadora, EmpresaFaturadora,
@@ -79,7 +80,13 @@ export async function carregarPedido(numero: string) {
         ? [formatarEndereco(p.enderecoDeEntrega), p.enderecoDeEntrega.recebedor]
             .filter(Boolean).join(' · aos cuidados de ')
         : '',
-      valorVenda: Number(p.precoVenda) * p.qtdLinhas,
+      // POR LINHA, não o total. `DadosDoPedido` escreve "por linha" ao lado do
+      // número, e o sample-data da seção confirma: 62,90 com 8 linhas. A Lista
+      // usa o MESMO nome de campo para o total do pedido (1.259,86 com 14
+      // linhas) — dois significados, um nome só, em seções diferentes do mesmo
+      // pacote. Multiplicar aqui fazia a ficha dizer que a linha custa oito
+      // vezes o que custa. O total do pedido está no resumo da cobrança.
+      valorVenda: Number(p.precoVenda),
       vendedor: p.vendedor,
       dataEntrada: dataDoDesign(p.dataEntrada),
       dataSituacao: dataDoDesign(p.dataSituacao),
@@ -90,6 +97,13 @@ export async function carregarPedido(numero: string) {
       dataPortabilidade: p.dataPortabilidade,
       observacao: p.observacao,
     },
+    // Fora de `pedido` de propósito: o tipo `Pedido` é contrato do pacote de
+    // design, e o que ele não pede não entra nele.
+    cobranca: calcularCobranca({
+      precoVenda: Number(p.precoVenda),
+      valorDoChip: Number(p.valorDoChip),
+      qtdLinhas: p.qtdLinhas,
+    }),
     situacoes: SITUACOES.map((s) => ({ ...s })),
     historico: [...historicoBruto].reverse().map((h) => ({
       id: String(h.id),
