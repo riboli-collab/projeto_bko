@@ -3,6 +3,15 @@ import { planos } from '@/db/schema'
 import { DOCUMENTOS } from '@/dominio/documentos'
 import { TelaEntrada } from '@/telas/TelaEntrada'
 
+/**
+ * Renderizada a cada requisição, nunca pré-gerada.
+ *
+ * Sem isto o `next build` consulta o banco e assa o HTML: a Esteira em produção
+ * mostraria a fila do momento em que o deploy foi feito, e o build passaria a
+ * exigir DATABASE_URL — falhando onde o banco ainda não existe.
+ */
+export const dynamic = 'force-dynamic'
+
 export default async function NovoPedido() {
   const catalogo = await db.select().from(planos)
   return <TelaEntrada opcoes={{

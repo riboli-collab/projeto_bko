@@ -9,6 +9,13 @@ const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500', '600'],
 
 export const metadata: Metadata = { title: 'Esteira — BKO' }
 
+/**
+ * O layout consulta o banco para o contador de prazo estourado da barra lateral,
+ * então **nada** sob ele pode ser pré-gerado — nem a raiz, que só redireciona.
+ * Declarado aqui, e não em cada página, porque a dependência é do layout.
+ */
+export const dynamic = 'force-dynamic'
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const contagens = await contarParaOShell()
   return (

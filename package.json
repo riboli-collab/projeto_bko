@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "carregar": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/carregar.ts",
-    "verificar": "vitest run && playwright test"
+    "verificar": "vitest run && playwright test",
+    "migrar": "node scripts/migrar.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

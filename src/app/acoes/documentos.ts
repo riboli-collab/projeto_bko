@@ -7,8 +7,14 @@ import { db } from '@/db/cliente'
 import { anexos } from '@/db/schema'
 import type { DocumentoId } from '@/dominio/documentos'
 
-/** Fora de `public/`: nada aqui é servido por URL estática. */
-const RAIZ = path.join(process.cwd(), 'armazenamento')
+/**
+ * Fora de `public/`: nada aqui é servido por URL estática.
+ *
+ * Configurável porque em produção o disco do contêiner é efêmero — sem apontar
+ * para um volume montado, contrato social e RG desaparecem no primeiro
+ * redeploy, e o banco fica com linhas apontando para arquivo que não existe.
+ */
+const RAIZ = process.env.ARMAZENAMENTO_DIR ?? path.join(process.cwd(), 'armazenamento')
 
 const TIPOS_ACEITOS = ['application/pdf', 'image/jpeg', 'image/png']
 const TAMANHO_MAXIMO = 10 * 1024 * 1024
