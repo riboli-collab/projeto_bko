@@ -57,7 +57,10 @@ export function TravaDePreco({ bloqueio, excecao, onSolicitarExcecao }: TravaDeP
   }
 
   return (
-    <div className="mt-2 rounded-md border border-red-200 bg-red-50/70 p-3 dark:border-red-900/70 dark:bg-red-950/40">
+    <div
+      data-testid="painel-de-preco"
+      className="mt-2 rounded-md border border-red-200 bg-red-50/70 p-3 dark:border-red-900/70 dark:bg-red-950/40"
+    >
       <p className="flex items-center gap-2 text-xs font-semibold text-red-900 dark:text-red-200">
         <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden="true" />
         Preço abaixo do custo — o pedido não grava assim

@@ -35,7 +35,7 @@ describe('leitura de dados/clientes.csv', () => {
     // Não traz telefone, e-mail de assinatura nem endereço fiscal — verificado
     // também nas sete abas da planilha de origem.
     const comAlgum = validos.filter(
-      (c) => c.telefone !== '' || c.emailAssinatura !== '' || c.enderecoFiscal !== '',
+      (c) => c.telefone !== '' || c.emailAssinatura !== '' || c.enderecoFiscal !== null,
     )
     expect(comAlgum).toHaveLength(0)
   })

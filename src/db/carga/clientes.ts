@@ -15,7 +15,12 @@ export interface NovoCliente {
   emailFinanceiro: string
   emailAssinatura: string
   telefone: string
-  enderecoFiscal: string
+  /**
+   * Nulo: a base de origem não tem endereço fiscal — a coluna "ENDEREÇO
+   * COBRANÇA" da planilha guarda e-mail, conferido nas sete abas (R10 do PRD).
+   * Vazio e explícito, nunca uma string em branco fingindo endereço.
+   */
+  enderecoFiscal: null
 }
 
 export interface ClienteRejeitado {
@@ -80,7 +85,7 @@ export function lerClientes(caminhoCsv: string): {
       emailFinanceiro: (c[iEmail] ?? '').trim(),
       emailAssinatura: '',
       telefone: '',
-      enderecoFiscal: '',
+      enderecoFiscal: null,
     })
   }
 

@@ -1,6 +1,7 @@
 import {
-  pgTable, text, integer, numeric, boolean, timestamp, date, serial, uniqueIndex,
+  pgTable, text, integer, numeric, boolean, timestamp, date, serial, uniqueIndex, jsonb,
 } from 'drizzle-orm/pg-core'
+import type { Endereco, EnderecoDeEntrega } from '@/dominio/tipos'
 
 export const clientes = pgTable('clientes', {
   cnpjCpf: text('cnpj_cpf').primaryKey(),
@@ -14,7 +15,9 @@ export const clientes = pgTable('clientes', {
   // Não existem na base de origem. O Comercial digita no primeiro pedido.
   emailAssinatura: text('email_assinatura').notNull().default(''),
   telefone: text('telefone').notNull().default(''),
-  enderecoFiscal: text('endereco_fiscal').notNull().default(''),
+  // A forma é a que a tela coleta. Nasce nulo: não existe na base de origem,
+  // e o Comercial preenche no primeiro pedido do cliente (R10 do PRD).
+  enderecoFiscal: jsonb('endereco_fiscal').$type<Endereco>(),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -51,7 +54,8 @@ export const pedidos = pgTable('pedidos', {
   tipo: text('tipo').notNull(),
   tipoDeChip: text('tipo_de_chip').notNull(),
   formaDeEntrega: text('forma_de_entrega'),
-  enderecoDeEntrega: text('endereco_de_entrega').notNull().default(''),
+  // Nulo em eSIM e em retirada no escritório — não é entrega que se endereça.
+  enderecoDeEntrega: jsonb('endereco_de_entrega').$type<EnderecoDeEntrega>(),
   dataPortabilidade: date('data_portabilidade'),
   vendedor: text('vendedor').notNull(),
   observacao: text('observacao').notNull().default(''),

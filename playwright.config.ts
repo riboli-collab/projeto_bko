@@ -1,4 +1,6 @@
 import { defineConfig } from '@playwright/test'
+// O processo de teste também fala com o banco: ele limpa a própria fixture.
+import './testes/carregar-env'
 
 export default defineConfig({
   testDir: './testes/fluxo',

@@ -35,3 +35,27 @@ export type FormaDeEntrega = 'Retirada no escritório' | 'Motoboy' | 'Correios'
 
 /** Por onde a venda entrou. Não se confunde com a empresa que fatura. */
 export type CanalDeVenda = 'IG' | 'MAN' | '2BX' | 'Operadora direto'
+
+/**
+ * Endereço com a forma que a tela coleta — sete campos, não uma linha de texto.
+ *
+ * Definido aqui, e não em `validacao-do-pedido.ts`, porque o schema do banco
+ * precisa dele antes de existir validação: guardar o endereço como `text` faz o
+ * componente `CamposDeEndereco` ler `.logradouro` de uma string e a tela quebra
+ * na primeira tecla. CEP, cidade, estado e o nome de quem recebe o chip
+ * simplesmente não chegariam ao banco.
+ */
+export interface Endereco {
+  logradouro: string
+  numero: string
+  complemento: string
+  bairro: string
+  cidade: string
+  estado: string
+  cep: string
+}
+
+export interface EnderecoDeEntrega extends Endereco {
+  /** Nome de quem recebe. Obrigatório em motoboy e Correios. */
+  recebedor: string
+}
