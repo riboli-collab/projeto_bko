@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: esteira-postgres
+    environment:
+      POSTGRES_USER: esteira
+      POSTGRES_PASSWORD: esteira_local
+      POSTGRES_DB: esteira
+    ports:
+      - "5432:5432"
+    volumes:
+      - esteira-pgdata:/var/lib/postgresql/data
+volumes:
+  esteira-pgdata:
