@@ -1,3 +1,6 @@
-export default function Pedidos() {
-  return <h1>Lista de pedidos</h1>
+import { listarPedidos, FILTROS_VAZIOS } from '@/consultas/lista'
+import { TelaLista } from '@/telas/TelaLista'
+
+export default async function Pedidos() {
+  return <TelaLista inicial={await listarPedidos(FILTROS_VAZIOS)} />
 }
