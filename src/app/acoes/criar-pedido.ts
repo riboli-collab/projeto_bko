@@ -8,6 +8,8 @@ import { responsavelPor } from '@/dominio/roteamento'
 import { formatarNumero } from '@/dominio/numeracao'
 import { avaliarPreco, type OrigemDoCusto } from '@/dominio/preco'
 import { validarPedido } from '@/dominio/validacao-do-pedido'
+import { faltamDocumentos, motivoDoBloqueio } from '@/dominio/documentos'
+import { listarAnexos, amarrarAnexosAoPedido } from '@/app/acoes/documentos'
 import { SITUACOES } from '@/dominio/situacoes'
 import type { Operadora, EmpresaFaturadora, TipoDePedido, TipoDeChip, FormaDeEntrega, CanalDeVenda, SituacaoId, Endereco, EnderecoDeEntrega } from '@/dominio/tipos'
 
@@ -33,6 +35,8 @@ export interface EntradaDePedido {
   dataPortabilidade: string | null
   vendedor: string
   observacao: string
+  /** Onde os anexos estão pendurados até o pedido ter número. */
+  rascunhoId: string
 }
 
 const ENCERRADOS: SituacaoId[] = SITUACOES.filter((s) => s.encerra).map((s) => s.id)
@@ -65,6 +69,17 @@ export async function criarPedido(entrada: EntradaDePedido) {
   }
 
   if (Object.keys(erros).length) return { ok: false as const, erros }
+
+  // RN4: sem os documentos obrigatórios do tipo de pessoa, o pedido não é criado.
+  // Depois dos campos, de propósito — o tipo de pessoa sai do documento, e
+  // documento inválido não decide se pede contrato social ou RG.
+  const anexados = (await listarAnexos(entrada.rascunhoId)).map((a) => a.documentoId)
+  const faltando = faltamDocumentos(doc.length === 11 ? 'PF' : 'PJ', anexados)
+  if (faltando.length) {
+    // Documento não tem CampoId: a mensagem vai numa chave própria, que a tela
+    // mostra no lugar onde o componente explica o botão desabilitado.
+    return { ok: false as const, erros: { documentos: motivoDoBloqueio(faltando)! } }
+  }
 
   const criado = await db.transaction(async (tx) => {
     // O cliente pode ser novo: cadastro só existe uma vez, chaveado pelo documento (RN5).
@@ -135,6 +150,11 @@ export async function criarPedido(entrada: EntradaDePedido) {
 
     return { ok: true as const, numero, responsavel }
   })
+
+  // Fora da transação: mover arquivo não desfaz junto com um rollback, e o
+  // pedido já existe. Falhar aqui deixa o anexo no rascunho — recuperável —
+  // em vez de deixar o pedido sem número.
+  await amarrarAnexosAoPedido(entrada.rascunhoId, criado.numero)
 
   // Sem isto o pedido nasce no banco e a fila continua mostrando a página
   // anterior: quem acabou de criar não encontra o próprio pedido.

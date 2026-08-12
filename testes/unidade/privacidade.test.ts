@@ -42,6 +42,24 @@ describe('regra de privacidade — estrutural, não opcional', () => {
     expect(ignorado.trim()).toBe('.env.local')
   })
 
+  /**
+   * Contrato social, RG e comprovante de residência são dado pessoal em estado
+   * puro. Duas coisas os protegem, e as duas são estruturais: a pasta é
+   * ignorada pelo git, e não fica dentro de `public/` — de onde o Next serve
+   * qualquer arquivo por URL, sem passar por código nenhum.
+   */
+  it('os anexos ficam fora do repositório e fora de public/', () => {
+    const ignorado = execSync('git check-ignore armazenamento || true', { encoding: 'utf8', cwd: RAIZ })
+    expect(ignorado.trim()).toBe('armazenamento')
+    expect(fs.existsSync(path.join(RAIZ, 'public/armazenamento'))).toBe(false)
+
+    // E o caminho do arquivo nunca vem da URL: a rota lê o id, busca no banco e
+    // usa o caminho gravado. Sem isso, `../../.env.local` seria um id válido.
+    const rota = fs.readFileSync(path.join(RAIZ, 'src/app/api/documentos/[id]/route.ts'), 'utf8')
+    expect(rota).toContain('eq(anexos.id, numero)')
+    expect(rota).not.toMatch(/readFile\([^)]*params/)
+  })
+
   it('nenhuma credencial no repositório', () => {
     const achados = execSync(
       // `--exclude` no próprio arquivo: sem isso a guarda acha o padrão que ela

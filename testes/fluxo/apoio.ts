@@ -1,5 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 import postgres from 'postgres'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 
 /**
  * O que os testes de fluxo compartilham.
@@ -17,6 +20,7 @@ export const CNPJ_DE_TESTE = '11222333000181'
 export async function limparPedidosDeTeste() {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
   await sql`delete from pendencias`
+  await sql`delete from anexos`
   await sql`delete from historico_de_situacao`
   await sql`delete from pedidos`
   // Antes do cliente: a divergência aponta para ele por chave estrangeira.
@@ -81,6 +85,14 @@ export async function lerCliente() {
   return c
 }
 
+/** Os anexos gravados, direto do banco. O caminho prova onde o arquivo foi parar. */
+export async function lerAnexos() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const linhas = await sql`select * from anexos order by id`
+  await sql.end()
+  return linhas
+}
+
 /** A fila de divergências de cadastro, direto do banco. */
 export async function lerDivergencias() {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
@@ -105,9 +117,16 @@ async function preencherEndereco(page: Page, prefixo: string) {
  */
 export async function preencherPedido(
   page: Page,
-  opcoes: { operadora?: string; plano?: string; valor?: string; empresa?: string | null } = {},
+  opcoes: {
+    operadora?: string; plano?: string; valor?: string; empresa?: string | null
+    /** Anexa os dois obrigatórios do CNPJ. Sem eles o pedido não é criado (RN4). */
+    anexos?: boolean
+  } = {},
 ) {
-  const { operadora = 'Claro', plano = 'ilimitado 1 GB', valor = '49.90', empresa = 'IG' } = opcoes
+  const {
+    operadora = 'Claro', plano = 'ilimitado 1 GB', valor = '49.90', empresa = 'IG',
+    anexos = true,
+  } = opcoes
 
   await page.locator('#campo-cnpjCpf').fill(CNPJ_DE_TESTE)
   await page.locator('#campo-razaoSocial').fill('Comércio Exemplo Ltda')
@@ -132,7 +151,26 @@ export async function preencherPedido(
     .getByRole('radio', { name: 'Linha nova' }).click()
   await page.getByRole('radiogroup', { name: 'Chip' })
     .getByRole('radio', { name: 'eSIM' }).click()
+
+  // O CNPJ de teste é PJ: contrato social e documento do representante. A fatura
+  // é opcional e fica de fora — ela só é pedida quando existe.
+  if (anexos) {
+    await campoDoAnexo(page, 'Contrato social').setInputFiles(pdfTemporario('contrato.pdf'))
+    await campoDoAnexo(page, 'Documento do representante legal')
+      .setInputFiles(pdfTemporario('rg.pdf'))
+    await expect(page.getByText('rg.pdf')).toBeVisible()
+  }
 }
+
+/** Um PDF mínimo, gerado na hora. Nenhum arquivo real entra no repositório. */
+export function pdfTemporario(nome: string): string {
+  const destino = path.join(os.tmpdir(), nome)
+  fs.writeFileSync(destino, '%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF')
+  return destino
+}
+
+/** O `input` do componente é `hidden`, mas tem nome acessível — e basta. */
+export const campoDoAnexo = (page: Page, rotulo: string) => page.getByLabel(`Anexar ${rotulo}`)
 
 /**
  * Abre a ficha do pedido pela fila, acionando a linha pelo teclado: o cabeçalho

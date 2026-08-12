@@ -16,6 +16,7 @@ const VALIDO: EntradaDePedido = {
   tipoDeChip: 'Físico', formaDeEntrega: 'Motoboy',
   enderecoDeEntrega: { ...ENDERECO, recebedor: 'Fernando Ribeiro' },
   dataPortabilidade: null, vendedor: 'Carlos', observacao: '',
+  rascunhoId: '00000000-0000-4000-8000-000000000000',
 }
 
 describe('validação dos 17 campos', () => {

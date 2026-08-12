@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 evidencias/
+
+# Anexos: contrato social, RG, comprovante de residência. Dado pessoal em
+# estado puro — fora do repositório, sempre.
+armazenamento/

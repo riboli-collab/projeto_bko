@@ -10,6 +10,8 @@ import { avaliarPreco, type CustoDoPlano } from '@/dominio/preco'
 import { validarPedido, type CampoId } from '@/dominio/validacao-do-pedido'
 import { compararComABase, valoresDaBase, type DivergenciaDeCadastro } from '@/dominio/divergencias'
 import { registrarDivergencias } from '@/app/acoes/divergencias'
+import { anexarDocumento, removerAnexo } from '@/app/acoes/documentos'
+import type { DocumentoId } from '@/dominio/documentos'
 import type { Operadora } from '@/dominio/tipos'
 
 const ENDERECO_VAZIO = {
@@ -75,6 +77,12 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
   const [avisoDeDuplicidade, setAviso] = useState<any>(null)
   const [camposFaltantes, setCamposFaltantes] = useState<Record<string, string>>({})
   const [resultadoDoEnvio, setResultado] = useState<any>(null)
+  // Um identificador por formulário aberto. Os anexos ficam pendurados nele até
+  // o pedido nascer — é isso que permite anexar antes de existir número.
+  const [rascunhoId] = useState(() => crypto.randomUUID())
+  const [anexos, setAnexos] = useState<
+    { documentoId: DocumentoId; nome: string; tamanho: number; anexadoEm: string }[]
+  >([])
   const [erro, setErro] = useState<string | null>(null)
   const [enviando, iniciar] = useTransition()
 
@@ -163,6 +171,25 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
       // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
       camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
       bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}
+      anexos={anexos}
+      onAnexar={(documentoId, arquivo) => iniciar(async () => {
+        const dados = new FormData()
+        dados.set('rascunhoId', rascunhoId)
+        dados.set('documentoId', documentoId)
+        dados.set('quem', QUEM)
+        dados.set('arquivo', arquivo)
+        const r = await anexarDocumento(dados)
+        if (r.ok) {
+          setAnexos((atual) => [...atual.filter((a) => a.documentoId !== documentoId), r.anexo])
+          setErro(null)
+        } else {
+          setErro(r.motivo)
+        }
+      })}
+      onRemoverAnexo={(documentoId) => iniciar(async () => {
+        await removerAnexo(rascunhoId, documentoId)
+        setAnexos((atual) => atual.filter((a) => a.documentoId !== documentoId))
+      })}
       avisoDeDuplicidade={avisoDeDuplicidade}
       responsavelPrevisto={responsavelPrevisto}
       resultadoDoEnvio={resultadoDoEnvio}
@@ -177,6 +204,7 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
         // camada que conhece os dois vocabulários.
         const r = await criarPedido({
           ...rascunho,
+          rascunhoId,
           tipo: rascunho.tipoDeAcao,
           // `vendedor` está no modelo do PRD e NÃO existe no formulário
           // desenhado — não é um dos 17 campos. Até haver decisão, ele é quem

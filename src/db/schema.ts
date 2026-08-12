@@ -93,6 +93,27 @@ export const pendencias = pgTable('pendencias', {
 })
 
 /**
+ * Um arquivo anexado. O binário vive no disco, fora do repositório: contrato
+ * social, RG e comprovante de residência são dado pessoal em estado puro.
+ *
+ * `rascunhoId` existe porque o anexo chega **antes** do pedido — o Comercial anexa
+ * enquanto preenche, e o número só nasce no envio. Criado o pedido, `numeroDoPedido`
+ * é preenchido e os arquivos mudam de pasta.
+ */
+export const anexos = pgTable('anexos', {
+  id: serial('id').primaryKey(),
+  rascunhoId: text('rascunho_id').notNull(),
+  numeroDoPedido: text('numero_do_pedido').references(() => pedidos.numero),
+  documentoId: text('documento_id').notNull(),
+  nome: text('nome').notNull(),
+  tamanho: integer('tamanho').notNull(),
+  tipoMime: text('tipo_mime').notNull(),
+  caminho: text('caminho').notNull(),
+  anexadoPor: text('anexado_por').notNull(),
+  anexadoEm: timestamp('anexado_em', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
  * Fila de trabalho humano, como as de `dados/`. A Esteira não corrige cadastro
  * sozinha: registra que digitado e base discordam, e alguém decide.
  */

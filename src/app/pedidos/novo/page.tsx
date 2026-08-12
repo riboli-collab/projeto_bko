@@ -1,5 +1,6 @@
 import { db } from '@/db/cliente'
 import { planos } from '@/db/schema'
+import { DOCUMENTOS } from '@/dominio/documentos'
 import { TelaEntrada } from '@/telas/TelaEntrada'
 
 export default async function NovoPedido() {
@@ -18,6 +19,6 @@ export default async function NovoPedido() {
       custoPorLinha: p.custoPorLinha === null ? null : Number(p.custoPorLinha),
       origem: p.origemDoCusto,
     })),
-    documentos: [],   // O catálogo real chega na Tarefa 17, junto com os anexos
+    documentos: [...DOCUMENTOS],
   } as any} />
 }
