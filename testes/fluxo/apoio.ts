@@ -54,6 +54,31 @@ export async function criarPedidoNoBanco(numero = 'PED-2026-0001') {
   return numero
 }
 
+/**
+ * Um cliente como a base real os traz: só o primeiro nome no contato, marcado
+ * como incompleto, sem telefone, sem e-mail de assinatura e sem endereço fiscal.
+ * São 1.108 dos 1.126 assim.
+ */
+export async function criarClienteIncompleto(razaoSocial = 'Comércio Antigo Ltda') {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  await sql`
+    insert into clientes (cnpj_cpf, tipo, razao_social, contato, contato_incompleto, email_financeiro)
+    values (${CNPJ_DE_TESTE}, 'PJ', ${razaoSocial}, 'CLAUDIA', true, 'financeiro@exemplo.com.br')
+    on conflict (cnpj_cpf) do update set
+      razao_social = excluded.razao_social,
+      contato = excluded.contato,
+      contato_incompleto = true`
+  await sql.end()
+}
+
+/** Lê o cadastro direto do banco: o que a tela mostra não prova o que foi gravado. */
+export async function lerCliente() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const [c] = await sql`select * from clientes where cnpj_cpf = ${CNPJ_DE_TESTE}`
+  await sql.end()
+  return c
+}
+
 async function preencherEndereco(page: Page, prefixo: string) {
   await page.locator(`#${prefixo}-logradouro`).fill('Rua das Palmeiras')
   await page.locator(`#${prefixo}-numero`).fill('120')

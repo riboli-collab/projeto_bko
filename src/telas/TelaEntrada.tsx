@@ -7,11 +7,50 @@ import { criarPedido, acharDuplicidade } from '@/app/acoes/criar-pedido'
 import { buscarClienteAction } from '@/app/acoes/buscar-cliente'
 import { responsavelPor } from '@/dominio/roteamento'
 import { avaliarPreco, type CustoDoPlano } from '@/dominio/preco'
+import { validarPedido, type CampoId } from '@/dominio/validacao-do-pedido'
 import type { Operadora } from '@/dominio/tipos'
 
 const ENDERECO_VAZIO = {
   logradouro: '', numero: '', complemento: '',
   bairro: '', cidade: '', estado: '', cep: '',
+}
+
+const CAMPOS_DO_ENDERECO = ['logradouro', 'numero', 'bairro', 'cidade', 'estado', 'cep']
+
+/** Endereço com os seis campos obrigatórios digitados. Complemento não conta. */
+function enderecoTemConteudo(e: Record<string, string> | null): boolean {
+  return !!e && CAMPOS_DO_ENDERECO.every((k) => String(e[k] ?? '').trim() !== '')
+}
+
+/**
+ * O campo tem conteúdo — não necessariamente conteúdo certo.
+ *
+ * Em branco é **falta**, e a tela já a conta: o contador do bloco e o motivo do
+ * botão dizem quantos faltam. Preenchido e errado é **erro**, e aí a mensagem
+ * precisa aparecer na hora — o componente trava o envio por conta própria
+ * quando o formato é inválido, então esperar o servidor responder seria esperar
+ * um envio que nunca acontece, e o critério 2 do PRD nunca fecharia.
+ */
+function temConteudo(r: Record<string, any>, campo: CampoId): boolean {
+  switch (campo) {
+    case 'enderecoFiscal':
+      return enderecoTemConteudo(r.enderecoFiscal)
+    case 'formaDeEntrega':
+      if (!r.formaDeEntrega) return false
+      // Só cobra o endereço de entrega depois de digitado inteiro — senão a
+      // tela reclama de cidade e CEP enquanto o dedo ainda está no logradouro.
+      if (r.formaDeEntrega === 'Retirada no escritório') return true
+      return enderecoTemConteudo(r.enderecoDeEntrega)
+        && String(r.enderecoDeEntrega?.recebedor ?? '').trim() !== ''
+    case 'plano':
+      return Boolean(r.planoId)
+    case 'qtdLinhas':
+    case 'precoVenda':
+    case 'valorDoChip':
+      return r[campo] !== null && r[campo] !== undefined
+    default:
+      return String(r[campo] ?? '').trim() !== ''
+  }
 }
 
 /** Enquanto não há seletor de pessoa (Tarefa 22), o autor é fixo e declarado. */
@@ -41,6 +80,16 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
   const responsavelPrevisto = rascunho.operadora
     ? responsavelPor(rascunho.operadora as Operadora)
     : null
+
+  // A mesma função valida nos dois lados: aqui para a tela nomear o erro na
+  // hora, e no Server Action para valer. O servidor continua sendo a autoridade
+  // — isto aqui é o que a pessoa lê enquanto digita.
+  const errosDeFormato = useMemo(() => {
+    const todos = validarPedido({ ...rascunho, tipo: rascunho.tipoDeAcao })
+    return Object.fromEntries(
+      Object.entries(todos).filter(([campo]) => temConteudo(rascunho, campo as CampoId)),
+    ) as Record<string, string>
+  }, [rascunho])
 
   const plano = opcoes.planos.find((p) => p.id === rascunho.planoId) ?? null
   const preco = useMemo(
@@ -92,7 +141,8 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
       opcoes={opcoes as any}
       resultadoDaBusca={resultadoDaBusca}
       clienteEncontrado={clienteEncontrado}
-      camposFaltantes={camposFaltantes}
+      // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
+      camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
       bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}
       avisoDeDuplicidade={avisoDeDuplicidade}
       responsavelPrevisto={responsavelPrevisto}

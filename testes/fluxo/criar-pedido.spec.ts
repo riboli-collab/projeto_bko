@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test'
-import { CNPJ_DE_TESTE, limparPedidosDeTeste, preencherPedido } from './apoio'
+import {
+  CNPJ_DE_TESTE, criarClienteIncompleto, lerCliente, limparPedidosDeTeste, preencherPedido,
+} from './apoio'
 
 // Este spec cria pelo formulário: começa sempre com a base sem o cliente dele.
 test.beforeEach(limparPedidosDeTeste)
@@ -76,6 +78,64 @@ test('pedido incompleto não é criado e diz qual campo falta', async ({ page })
   await expect(botao).toBeDisabled()
   await expect(page.getByText(/1 campo obrigatório|falta/i).first()).toBeVisible()
   await expect(page.getByText(/PED-2026-/)).toHaveCount(0)
+})
+
+/**
+ * Critério 2 do PRD: três erros de formato aparecendo de uma vez.
+ *
+ * Sem clicar em nada. O componente trava o envio por conta própria quando o
+ * documento ou o telefone estão fora do formato — esperar a resposta do
+ * servidor seria esperar um envio que nunca acontece. As mensagens saem da
+ * mesma `validarPedido` que o Server Action usa, rodando na tela enquanto a
+ * pessoa digita.
+ */
+test('os erros de formato aparecem todos de uma vez, não um a um', async ({ page }) => {
+  await page.goto('/pedidos/novo')
+  await preencherPedido(page)
+  await page.locator('#campo-cnpjCpf').fill('112223330001')
+  await page.locator('#campo-telefone').fill('4999')
+  await page.locator('#campo-emailFinanceiro').fill('financeiro@')
+
+  const resumo = page.getByRole('alert').filter({ hasText: 'campos impedem o envio' })
+  await expect(resumo).toContainText('3 campos impedem o envio')
+  await expect(resumo).toContainText('CNPJ tem 14 dígitos e CPF tem 11 — você digitou 12')
+  await expect(resumo).toContainText('Telefone com DDD tem 10 ou 11 dígitos — você digitou 4')
+  await expect(resumo).toContainText('E-mail financeiro em formato inválido')
+
+  // E nada do que foi digitado se perde: a tela nomeia o erro, não limpa o campo.
+  await expect(page.locator('#campo-razaoSocial')).toHaveValue('Comércio Exemplo Ltda')
+  await expect(page.getByText(/PED-\d{4}-\d{4}/)).toHaveCount(0)
+})
+
+test('campo em branco é falta contada, não erro nomeado', async ({ page }) => {
+  await page.goto('/pedidos/novo')
+  // Formulário vazio: 17 campos em branco e nenhum erro. Abrir a tela cheia de
+  // vermelho ensina a ignorar o vermelho.
+  await expect(page.getByRole('alert').filter({ hasText: 'impedem o envio' })).toHaveCount(0)
+  await expect(page.getByText(/campos obrigatórios em branco/)).toBeVisible()
+})
+
+test('o contato corrigido volta para a base; a razão social divergente não', async ({ page }) => {
+  // A base traz "CLAUDIA" — primeiro nome só, marcado como incompleto.
+  await criarClienteIncompleto('Comércio Antigo Ltda')
+
+  await page.goto('/pedidos/novo')
+  await page.locator('#campo-cnpjCpf').fill(CNPJ_DE_TESTE)
+  // Espera o cadastro chegar: é ele que preenche o contato incompleto na tela.
+  await expect(page.locator('#campo-contato')).toHaveValue('CLAUDIA')
+
+  // O Comercial completa o nome e digita outra razão social.
+  await preencherPedido(page, { operadora: 'Vivo', plano: 'ilimitado 6 GB', valor: '49.90' })
+  await page.locator('#campo-contato').fill('Claudia Menezes')
+  await page.getByRole('button', { name: 'Criar pedido' }).click()
+  await expect(page.getByText(/PED-\d{4}-\d{4}/)).toBeVisible()
+
+  const cliente = await lerCliente()
+  // 4b: a correção fecha o ciclo — a próxima venda já encontra o nome inteiro.
+  expect(cliente.contato).toBe('Claudia Menezes')
+  expect(cliente.contato_incompleto).toBe(false)
+  // Razão social divergente NÃO é sobrescrita em silêncio: vira registro (Tarefa 16).
+  expect(cliente.razao_social).toBe('Comércio Antigo Ltda')
 })
 
 test('cria um pedido e mostra número, responsável e status', async ({ page }) => {

@@ -7,6 +7,7 @@ import { pedidos, clientes, planos, historicoDeSituacao, sequenciaDePedido } fro
 import { responsavelPor } from '@/dominio/roteamento'
 import { formatarNumero } from '@/dominio/numeracao'
 import { avaliarPreco, type OrigemDoCusto } from '@/dominio/preco'
+import { validarPedido } from '@/dominio/validacao-do-pedido'
 import { SITUACOES } from '@/dominio/situacoes'
 import type { Operadora, EmpresaFaturadora, TipoDePedido, TipoDeChip, FormaDeEntrega, CanalDeVenda, SituacaoId, Endereco, EnderecoDeEntrega } from '@/dominio/tipos'
 
@@ -37,23 +38,11 @@ export interface EntradaDePedido {
 const ENCERRADOS: SituacaoId[] = SITUACOES.filter((s) => s.encerra).map((s) => s.id)
 
 export async function criarPedido(entrada: EntradaDePedido) {
-  const erros: Record<string, string> = {}
+  // Todos os erros de campo de uma vez, com os identificadores que o componente
+  // sabe destacar. O preço fica de fora porque é a única regra que precisa do banco.
+  const erros: Record<string, string> = { ...validarPedido(entrada) }
 
   const doc = entrada.cnpjCpf.replace(/\D/g, '')
-  if (doc.length !== 11 && doc.length !== 14) {
-    erros.cnpjCpf = `CNPJ tem 14 dígitos e CPF tem 11 — você digitou ${doc.length}`
-  }
-  if (!entrada.empresaFaturadora) {
-    erros.empresaFaturadora = 'Empresa faturadora em branco não passa, e não se preenche por dedução'
-  }
-  if (entrada.qtdLinhas <= 0) erros.qtdLinhas = 'Quantidade de linhas precisa ser maior que zero'
-  if (entrada.precoVenda <= 0) erros.precoVenda = 'Preço de venda precisa ser maior que zero'
-  if (entrada.tipo === 'Portabilidade' && !entrada.dataPortabilidade) {
-    erros.dataPortabilidade = 'Portabilidade exige a data agendada'
-  }
-  if (entrada.tipoDeChip === 'Físico' && !entrada.formaDeEntrega) {
-    erros.formaDeEntrega = 'Chip físico exige forma de entrega'
-  }
 
   const [plano] = await db.select().from(planos).where(eq(planos.id, entrada.planoId))
   if (!plano) {
@@ -82,9 +71,27 @@ export async function criarPedido(entrada: EntradaDePedido) {
     await tx.insert(clientes).values({
       cnpjCpf: doc, tipo: doc.length === 11 ? 'PF' : 'PJ',
       razaoSocial: entrada.razaoSocial, contato: entrada.contato,
+      contatoIncompleto: false,
       emailFinanceiro: entrada.emailFinanceiro, emailAssinatura: entrada.emailAssinatura,
       telefone: entrada.telefone, enderecoFiscal: entrada.enderecoFiscal,
-    }).onConflictDoNothing()
+    }).onConflictDoUpdate({
+      target: clientes.cnpjCpf,
+      // O contato corrigido **volta para a base** — é o que fecha o ciclo do
+      // critério 4b em vez de só reclamar na tela. A validação já garantiu que
+      // ele tem nome e sobrenome, então a marca de incompleto cai junto.
+      //
+      // Razão social NÃO entra: divergência de cadastro é registro, não correção
+      // silenciosa (Tarefa 16). E-mail financeiro também não — é o único campo
+      // de contato que a base já trazia preenchido, e sobrescrever apagaria o
+      // que o Financeiro conferiu para colocar o que o Comercial digitou de novo.
+      set: {
+        contato: entrada.contato,
+        contatoIncompleto: false,
+        telefone: entrada.telefone,
+        emailAssinatura: entrada.emailAssinatura,
+        enderecoFiscal: entrada.enderecoFiscal,
+      },
+    })
 
     const ano = new Date().getFullYear()
     const [seq] = await tx
