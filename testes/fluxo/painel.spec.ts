@@ -1,4 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { criarPedidoNoBanco, limparPedidosDeTeste } from './apoio'
+
+// A fila que estes testes leem é montada por eles, não herdada de outro spec.
+test.beforeEach(async () => {
+  await limparPedidosDeTeste()
+  await criarPedidoNoBanco()
+})
 
 test('mostra as quatro perguntas na ordem, em grade 2x2 sem rolagem', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 })

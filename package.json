@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "carregar": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/carregar.ts"
+    "carregar": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/carregar.ts",
+    "verificar": "vitest run && playwright test"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

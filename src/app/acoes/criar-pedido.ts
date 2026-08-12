@@ -1,6 +1,7 @@
 'use server'
 
 import { eq, and, inArray, sql } from 'drizzle-orm'
+import { revalidatePath } from 'next/cache'
 import { db } from '@/db/cliente'
 import { pedidos, clientes, planos, historicoDeSituacao, sequenciaDePedido } from '@/db/schema'
 import { responsavelPor } from '@/dominio/roteamento'
@@ -76,7 +77,7 @@ export async function criarPedido(entrada: EntradaDePedido) {
 
   if (Object.keys(erros).length) return { ok: false as const, erros }
 
-  return await db.transaction(async (tx) => {
+  const criado = await db.transaction(async (tx) => {
     // O cliente pode ser novo: cadastro só existe uma vez, chaveado pelo documento (RN5).
     await tx.insert(clientes).values({
       cnpjCpf: doc, tipo: doc.length === 11 ? 'PF' : 'PJ',
@@ -127,6 +128,12 @@ export async function criarPedido(entrada: EntradaDePedido) {
 
     return { ok: true as const, numero, responsavel }
   })
+
+  // Sem isto o pedido nasce no banco e a fila continua mostrando a página
+  // anterior: quem acabou de criar não encontra o próprio pedido.
+  revalidatePath('/pedidos')
+  revalidatePath('/painel')
+  return criado
 }
 
 export async function acharDuplicidade(cnpjCpf: string, qtdLinhas: number) {

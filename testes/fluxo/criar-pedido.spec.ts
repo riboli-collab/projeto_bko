@@ -1,75 +1,8 @@
-import { test, expect, type Page } from '@playwright/test'
-import postgres from 'postgres'
+import { test, expect } from '@playwright/test'
+import { CNPJ_DE_TESTE, limparPedidosDeTeste, preencherPedido } from './apoio'
 
-/**
- * Os seletores aqui são os do componente exportado, não os que a gente
- * gostaria que ele tivesse: os campos têm `id="campo-<CampoId>"`, os rótulos
- * saem de `ROTULO_DO_CAMPO` (o preço se chama "Valor", não "Preço de venda")
- * e as listas fechadas são `role="radiogroup"` com botões `role="radio"`.
- */
-
-const CNPJ_NOVO = '11222333000181'
-
-/**
- * Cada teste começa com a base limpa do que ele mesmo cria.
- *
- * Sem isto, o segundo teste encontra o pedido do primeiro: o aviso de
- * duplicidade dispara, a busca acha o cliente e o formulário muda de estado —
- * e a falha aparece longe da causa.
- */
-test.beforeEach(async () => {
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
-  await sql`delete from historico_de_situacao where numero_do_pedido in (select numero from pedidos where cnpj_cpf = ${CNPJ_NOVO})`
-  await sql`delete from pedidos where cnpj_cpf = ${CNPJ_NOVO}`
-  await sql`delete from clientes where cnpj_cpf = ${CNPJ_NOVO}`
-  await sql`delete from sequencia_de_pedido`
-  await sql.end()
-})
-
-async function preencherEndereco(page: Page, prefixo: string) {
-  await page.locator(`#${prefixo}-logradouro`).fill('Rua das Palmeiras')
-  await page.locator(`#${prefixo}-numero`).fill('120')
-  await page.locator(`#${prefixo}-bairro`).fill('Centro')
-  await page.locator(`#${prefixo}-cidade`).fill('Chapecó')
-  await page.locator(`#${prefixo}-estado`).fill('SC')
-  await page.locator(`#${prefixo}-cep`).fill('89801000')
-}
-
-/**
- * Preenche o pedido inteiro. `plano` é o rótulo da opção no select, e `valor`
- * vai com ponto: `input[type=number]` não aceita vírgula — ela é da formatação
- * de saída, não da digitação.
- */
-async function preencherPedido(
-  page: Page,
-  opcoes: { operadora?: string; plano?: string; valor?: string; empresa?: string | null } = {},
-) {
-  const { operadora = 'Claro', plano = 'ilimitado 1 GB', valor = '49.90', empresa = 'IG' } = opcoes
-
-  await page.locator('#campo-cnpjCpf').fill(CNPJ_NOVO)
-  await page.locator('#campo-razaoSocial').fill('Comércio Exemplo Ltda')
-  await preencherEndereco(page, 'campo-enderecoFiscal')
-  await page.locator('#campo-contato').fill('Fernando Ribeiro')
-  await page.locator('#campo-telefone').fill('49988887777')
-  await page.locator('#campo-emailAssinatura').fill('assina@exemplo.com.br')
-  await page.locator('#campo-emailFinanceiro').fill('financeiro@exemplo.com.br')
-
-  await page.locator('#campo-qtdLinhas').fill('4')
-  await page.getByRole('radiogroup', { name: 'Venda' }).getByRole('radio', { name: 'IG' }).click()
-  await page.locator('#campo-operadora').selectOption({ label: operadora })
-  await page.locator('#campo-plano').selectOption({ label: plano })
-  await page.locator('#campo-precoVenda').fill(valor)
-  await page.locator('#campo-valorDoChip').fill('0')
-
-  if (empresa !== null) {
-    await page.getByRole('radiogroup', { name: 'Empresa faturadora' })
-      .getByRole('radio', { name: empresa }).click()
-  }
-  await page.getByRole('radiogroup', { name: 'Tipo de ação' })
-    .getByRole('radio', { name: 'Linha nova' }).click()
-  await page.getByRole('radiogroup', { name: 'Chip' })
-    .getByRole('radio', { name: 'eSIM' }).click()
-}
+// Este spec cria pelo formulário: começa sempre com a base sem o cliente dele.
+test.beforeEach(limparPedidosDeTeste)
 
 test('a empresa faturadora NÃO se preenche sozinha a partir da operadora', async ({ page }) => {
   await page.goto('/pedidos/novo')

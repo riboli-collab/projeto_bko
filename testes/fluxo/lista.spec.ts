@@ -1,4 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
+import { criarPedidoNoBanco, limparPedidosDeTeste } from './apoio'
+
+// A fila que estes testes leem é montada por eles, não herdada de outro spec.
+test.beforeEach(async () => {
+  await limparPedidosDeTeste()
+  await criarPedidoNoBanco()
+})
 
 /**
  * A Lista renderiza duas vezes o mesmo pedido: cartão no mobile, linha na tabela

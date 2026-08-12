@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import postgres from 'postgres'
+import { criarPedidoNoBanco, limparPedidosDeTeste } from './apoio'
 
 /**
  * Cada teste move o mesmo pedido. Sem devolver ele ao início, o segundo teste
@@ -9,12 +9,10 @@ import postgres from 'postgres'
  * a volta acontece aqui, no SQL do teste, e não por nenhuma porta do sistema.
  */
 test.beforeEach(async () => {
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
-  await sql`delete from pendencias`
-  await sql`delete from historico_de_situacao where id not in (select min(id) from historico_de_situacao group by numero_do_pedido)`
-  await sql`update pedidos set situacao_id = 'PEDIDO_DO_COMERCIAL', data_situacao = now()`
-  await sql`update historico_de_situacao set para = 'PEDIDO_DO_COMERCIAL', de = null`
-  await sql.end()
+  // Cada teste move o mesmo pedido. Recriar é mais honesto que voltar situação:
+  // voltar é coisa que a Esteira não faz por regra (RN12), nem no teste.
+  await limparPedidosDeTeste()
+  await criarPedidoNoBanco()
 })
 
 async function abrirPrimeiroPedido(page: Page) {
