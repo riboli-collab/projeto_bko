@@ -92,6 +92,22 @@ export const pendencias = pgTable('pendencias', {
   ehRegra: boolean('eh_regra').notNull().default(false),
 })
 
+/**
+ * Fila de trabalho humano, como as de `dados/`. A Esteira não corrige cadastro
+ * sozinha: registra que digitado e base discordam, e alguém decide.
+ */
+export const divergenciasDeCadastro = pgTable('divergencias_de_cadastro', {
+  id: serial('id').primaryKey(),
+  cnpjCpf: text('cnpj_cpf').notNull().references(() => clientes.cnpjCpf),
+  numeroDoPedido: text('numero_do_pedido'),
+  campoId: text('campo_id').notNull(),
+  valorDaBase: text('valor_da_base').notNull(),
+  valorDigitado: text('valor_digitado').notNull(),
+  registradaPor: text('registrada_por').notNull(),
+  registradaEm: timestamp('registrada_em', { withTimezone: true }).notNull().defaultNow(),
+  resolvidaEm: timestamp('resolvida_em', { withTimezone: true }),
+})
+
 export const sequenciaDePedido = pgTable(
   'sequencia_de_pedido',
   { ano: integer('ano').primaryKey(), ultimo: integer('ultimo').notNull().default(0) },

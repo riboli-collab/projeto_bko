@@ -8,6 +8,8 @@ import { buscarClienteAction } from '@/app/acoes/buscar-cliente'
 import { responsavelPor } from '@/dominio/roteamento'
 import { avaliarPreco, type CustoDoPlano } from '@/dominio/preco'
 import { validarPedido, type CampoId } from '@/dominio/validacao-do-pedido'
+import { compararComABase, valoresDaBase, type DivergenciaDeCadastro } from '@/dominio/divergencias'
+import { registrarDivergencias } from '@/app/acoes/divergencias'
 import type { Operadora } from '@/dominio/tipos'
 
 const ENDERECO_VAZIO = {
@@ -91,6 +93,12 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
     ) as Record<string, string>
   }, [rascunho])
 
+  // Recalculada a cada tecla, contra o cadastro que a busca trouxe.
+  const divergencias: DivergenciaDeCadastro[] = useMemo(
+    () => (clienteEncontrado ? compararComABase(rascunho, clienteEncontrado) : []),
+    [rascunho, clienteEncontrado],
+  )
+
   const plano = opcoes.planos.find((p) => p.id === rascunho.planoId) ?? null
   const preco = useMemo(
     () => (plano && rascunho.precoVenda ? avaliarPreco({ precoVenda: rascunho.precoVenda, plano }) : null),
@@ -139,8 +147,19 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
       modo="criacao"
       rascunho={rascunho}
       opcoes={opcoes as any}
-      resultadoDaBusca={resultadoDaBusca}
+      resultadoDaBusca={
+        clienteEncontrado && divergencias.length > 0 ? 'divergente' : resultadoDaBusca
+      }
       clienteEncontrado={clienteEncontrado}
+      divergencias={divergencias}
+      onRegistrarDivergencia={(lista) => {
+        // O botão diz "registrar **e seguir com o da base**". As duas coisas:
+        // a divergência vira registro para alguém decidir depois, e o rascunho
+        // passa a valer o que a base guarda — senão a tela mostraria o digitado
+        // e o pedido nasceria com ele, que é justamente o que a regra recusa.
+        setRascunho((r: any) => ({ ...r, ...valoresDaBase(lista) }))
+        iniciar(async () => { await registrarDivergencias(rascunho.cnpjCpf, lista, QUEM) })
+      }}
       // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
       camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
       bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}

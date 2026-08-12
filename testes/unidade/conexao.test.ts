@@ -8,7 +8,9 @@ describe('conexão com o Postgres', () => {
     expect(linhas[0]).toEqual({ um: 1 })
   })
 
-  it('tem as sete tabelas da Esteira criadas', async () => {
+  // Lista fechada de propósito: tabela nova quebra este teste, e é para quebrar.
+  // Schema que cresce sem ninguém notar é como o banco vira planilha de novo.
+  it('tem as oito tabelas da Esteira criadas', async () => {
     const linhas = await db.execute(sql`
       select table_name from information_schema.tables
       where table_schema = 'public' order by table_name
@@ -17,6 +19,7 @@ describe('conexão com o Postgres', () => {
     expect(nomes).toEqual([
       'clientes',
       'clientes_rejeitados',
+      'divergencias_de_cadastro',
       'historico_de_situacao',
       'pedidos',
       'pendencias',

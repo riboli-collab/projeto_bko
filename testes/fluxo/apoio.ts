@@ -19,6 +19,8 @@ export async function limparPedidosDeTeste() {
   await sql`delete from pendencias`
   await sql`delete from historico_de_situacao`
   await sql`delete from pedidos`
+  // Antes do cliente: a divergência aponta para ele por chave estrangeira.
+  await sql`delete from divergencias_de_cadastro where cnpj_cpf = ${CNPJ_DE_TESTE}`
   await sql`delete from clientes where cnpj_cpf = ${CNPJ_DE_TESTE}`
   await sql`delete from sequencia_de_pedido`
   await sql.end()
@@ -77,6 +79,15 @@ export async function lerCliente() {
   const [c] = await sql`select * from clientes where cnpj_cpf = ${CNPJ_DE_TESTE}`
   await sql.end()
   return c
+}
+
+/** A fila de divergências de cadastro, direto do banco. */
+export async function lerDivergencias() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const linhas = await sql`
+    select * from divergencias_de_cadastro where cnpj_cpf = ${CNPJ_DE_TESTE} order by campo_id`
+  await sql.end()
+  return linhas
 }
 
 async function preencherEndereco(page: Page, prefixo: string) {
