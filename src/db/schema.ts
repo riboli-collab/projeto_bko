@@ -21,6 +21,14 @@ export const usuarios = pgTable('usuarios', {
   /** Etiqueta exibida no menu lateral. Ainda não restringe nada. */
   papel: text('papel').notNull(),
   senhaHash: text('senha_hash').notNull(),
+  /**
+   * Senha definida por quem administra, e que a pessoa ainda não trocou.
+   *
+   * Enquanto for `true`, entrar leva direto para a troca e nenhuma outra tela
+   * abre. É o que faz uma senha de estreia ser de estreia: quem administra
+   * conhece a senha até a primeira entrada, e não depois dela.
+   */
+  precisaTrocarSenha: boolean('precisa_trocar_senha').notNull().default(true),
   /** Desativar em vez de apagar: o histórico continua apontando para o nome. */
   ativo: boolean('ativo').notNull().default(true),
   criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),

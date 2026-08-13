@@ -4,7 +4,7 @@ import './globals.css'
 import { Shell } from '@/telas/Shell'
 import { headers } from 'next/headers'
 import { contarParaOShell } from '@/consultas/painel'
-import { ehAberto } from '@/dominio/sessao'
+import { semNavegacao } from '@/dominio/sessao'
 import { usuarioAtual } from '@/app/acoes/sessao'
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--fonte-corpo' })
@@ -20,10 +20,12 @@ export const metadata: Metadata = { title: 'Esteira — BKO' }
 export const dynamic = 'force-dynamic'
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // A tela de entrada não é parte do app: não leva navegação, e não pode
-  // consultar o banco — quem ainda não entrou não deve provocar consulta nenhuma.
+  // A entrada e a troca de senha não são parte do app: não levam navegação, e
+  // a entrada não pode consultar o banco — quem ainda não entrou não deve
+  // provocar consulta nenhuma. E oferecer navegação a quem ainda precisa
+  // trocar a senha seria oferecer o que o proxy vai recusar em seguida.
   const caminho = (await headers()).get('x-caminho') ?? ''
-  const semShell = ehAberto(caminho)
+  const semShell = semNavegacao(caminho)
 
   const [contagens, usuario] = semShell
     ? [null, null]

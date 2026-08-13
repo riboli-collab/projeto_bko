@@ -21,13 +21,13 @@ export default defineConfig({
     { name: 'autenticar', testMatch: /autenticar\.setup\.ts/ },
     {
       name: 'acesso',
-      testMatch: /acesso\.spec\.ts/,
+      testMatch: /(acesso|troca-de-senha)\.spec\.ts/,
       // Contexto limpo de propósito: é a porta fechada que está sendo medida.
       use: { storageState: { cookies: [], origins: [] } },
     },
     {
       name: 'fluxo',
-      testIgnore: [/acesso\.spec\.ts/, /autenticar\.setup\.ts/],
+      testIgnore: [/acesso\.spec\.ts/, /troca-de-senha\.spec\.ts/, /autenticar\.setup\.ts/],
       dependencies: ['autenticar'],
       use: { storageState: ARQUIVO_DE_SESSAO },
     },

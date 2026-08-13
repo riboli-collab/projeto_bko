@@ -8,10 +8,13 @@ export interface UsuarioDaSessao {
   usuario: string
   nome: string
   papel: string
+  /** Ainda usa a senha que quem administra definiu. */
+  precisaTrocarSenha: boolean
 }
 
 const publico = {
   id: usuarios.id, usuario: usuarios.usuario, nome: usuarios.nome, papel: usuarios.papel,
+  precisaTrocarSenha: usuarios.precisaTrocarSenha,
 }
 
 /** Normaliza o que se digita: "  Raquel " e "raquel" são a mesma pessoa. */

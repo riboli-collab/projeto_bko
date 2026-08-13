@@ -39,11 +39,23 @@ const deHex = (s: string) => {
   return bytes
 }
 
+export interface Sessao {
+  usuarioId: number
+  /**
+   * A senha ainda é a que quem administra definiu.
+   *
+   * Viaja **dentro** do que é assinado para o proxy poder decidir no Edge, sem
+   * banco. Fora da assinatura, trocar um `1` por `0` no cookie burlaria a troca
+   * obrigatória — que é justamente o que ela existe para impedir.
+   */
+  precisaTrocarSenha: boolean
+}
+
 /** Emite o cookie para um usuário já autenticado. `agora` entra para o teste. */
 export async function emitirSessao(
-  usuarioId: number, segredo: string, agora = Date.now(),
+  sessao: Sessao, segredo: string, agora = Date.now(),
 ): Promise<string> {
-  const corpo = `${usuarioId}.${agora + DURACAO_MS}`
+  const corpo = `${sessao.usuarioId}.${agora + DURACAO_MS}.${sessao.precisaTrocarSenha ? 1 : 0}`
   const assinatura = await crypto.subtle.sign(
     ALGORITMO, await chave(segredo), new TextEncoder().encode(corpo),
   )
@@ -64,7 +76,7 @@ export async function emitirSessao(
  */
 export async function usuarioDaSessao(
   cookie: string | undefined, segredo: string, agora = Date.now(),
-): Promise<number | null> {
+): Promise<Sessao | null> {
   if (!cookie) return null
   // Segredo vazio recusa em vez de estourar: `importKey` lança DataError com
   // chave de comprimento zero, e uma variável definida como string vazia
@@ -72,19 +84,21 @@ export async function usuarioDaSessao(
   if (!segredo) return null
 
   const partes = cookie.split('.')
-  if (partes.length !== 3) return null
-  const [id, validade, assinatura] = partes
+  if (partes.length !== 4) return null
+  const [id, validade, trocar, assinatura] = partes
 
-  if (!/^\d+$/.test(id) || !/^\d+$/.test(validade) || !/^[0-9a-f]+$/.test(assinatura)) return null
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(validade)) return null
+  if (trocar !== '0' && trocar !== '1') return null
+  if (!/^[0-9a-f]+$/.test(assinatura)) return null
   if (Number(validade) < agora) return null
 
   // `verify` do Web Crypto compara em tempo constante.
   const confere = await crypto.subtle.verify(
     ALGORITMO, await chave(segredo), deHex(assinatura),
-    new TextEncoder().encode(`${id}.${validade}`),
+    new TextEncoder().encode(`${id}.${validade}.${trocar}`),
   ).catch(() => false)
 
-  return confere ? Number(id) : null
+  return confere ? { usuarioId: Number(id), precisaTrocarSenha: trocar === '1' } : null
 }
 
 /**
@@ -98,4 +112,18 @@ export const ABERTOS = ['/entrar', '/saude']
 
 export function ehAberto(caminho: string): boolean {
   return ABERTOS.some((a) => caminho === a || caminho.startsWith(`${a}/`))
+}
+
+/**
+ * Onde a troca de senha acontece.
+ *
+ * **Não** é rota aberta: exige sessão. O que ela tem de especial é ser a única
+ * que abre enquanto a senha ainda é a de estreia — sem essa exceção, a troca
+ * obrigatória redirecionaria a própria tela de troca, em círculo.
+ */
+export const TROCA_DE_SENHA = '/trocar-senha'
+
+/** A tela não leva a navegação do app: é uma tarefa só, e ela ocupa a tela. */
+export function semNavegacao(caminho: string): boolean {
+  return ehAberto(caminho) || caminho === TROCA_DE_SENHA
 }

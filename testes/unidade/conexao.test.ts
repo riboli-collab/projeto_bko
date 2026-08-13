@@ -10,7 +10,7 @@ describe('conexão com o Postgres', () => {
 
   // Lista fechada de propósito: tabela nova quebra este teste, e é para quebrar.
   // Schema que cresce sem ninguém notar é como o banco vira planilha de novo.
-  it('tem as nove tabelas da Esteira criadas', async () => {
+  it('tem as dez tabelas da Esteira criadas', async () => {
     const linhas = await db.execute(sql`
       select table_name from information_schema.tables
       where table_schema = 'public' order by table_name
@@ -26,6 +26,7 @@ describe('conexão com o Postgres', () => {
       'pendencias',
       'planos',
       'sequencia_de_pedido',
+      'usuarios',
     ])
   })
 })

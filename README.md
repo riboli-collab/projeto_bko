@@ -34,7 +34,7 @@ planos, que é dado de negócio, use `npx tsx scripts/carregar-planos.ts`.
 ## Como verificar
 
 ```bash
-npm run verificar             # 168 testes de unidade + 69 de fluxo
+npm run verificar             # 181 testes de unidade + 76 de fluxo
 ```
 
 Os testes de fluxo sobem o app na porta 3100 e rodam contra o Postgres de
@@ -98,6 +98,7 @@ tela de administração: são seis pessoas num escritório, e a gestão é por C
 npm run usuarios listar
 npm run usuarios criar hiago "Hiago Ferreira" BKO
 npm run usuarios senha hiago          # sorteia outra e mostra uma vez
+npm run usuarios senha hiago 123456   # ou define a que se quiser
 npm run usuarios desativar hiago      # tira o acesso, preserva o histórico
 ```
 
@@ -105,11 +106,31 @@ A senha sorteada aparece **uma vez** e não há como recuperá-la — só sortea
 outra. Um banco de onde se lê a senha de volta é um banco que vaza a senha
 junto.
 
-O cookie é `id.validade.assinatura`, assinado com `SEGREDO_DA_SESSAO`. Ele diz
-**quem** entrou: é daí que sai o autor de cada transição. Dura oito horas — um
-turno. Trocar o segredo derruba todas as sessões de todo mundo, e é o botão de
-pânico; trocar a senha de uma pessoa **não** derruba a sessão dela, porque a
-assinatura não usa a senha.
+### Toda senha que quem administra define é de estreia
+
+Criar um usuário ou resetar a senha marca a conta com `precisa_trocar_senha`.
+Na entrada seguinte, a pessoa cai em `/trocar-senha` e **nenhuma outra tela
+abre** até ela escolher a própria senha. Daí em diante, quem definiu a senha de
+estreia não a conhece mais.
+
+Isso é o que devolve valor ao autor no histórico. Enquanto a mesma senha serve
+para todo mundo, qualquer um assina como qualquer um, e o *quem* volta a não
+valer como prova.
+
+O aviso viaja **dentro** do cookie assinado (`id.validade.troca.assinatura`),
+para o proxy decidir no Edge sem consultar o banco. Virar o `1` em `0` derruba
+a sessão inteira, porque o aviso faz parte do que foi assinado. E
+`exigirUsuario` confere de novo no banco, para o caso de a senha ser resetada
+no meio de uma sessão de oito horas.
+
+A senha atual é exigida **também** na troca obrigatória: sem isso, um
+computador deixado aberto viraria uma conta sequestrada.
+
+O cookie é assinado com `SEGREDO_DA_SESSAO` e diz **quem** entrou: é daí que sai
+o autor de cada transição. Dura oito horas — um turno. Trocar o segredo derruba
+todas as sessões de todo mundo, e é o botão de pânico; trocar a senha de uma
+pessoa **não** derruba a sessão dela, porque a assinatura não usa a senha — mas
+marca a conta para trocar, e a escrita para na ação seguinte.
 
 `/saude` fica fora da tranca de propósito. É por onde o Railway pergunta se o
 app subiu, e ele não digita senha: protegendo, todo deploy seria reprovado no
@@ -130,7 +151,8 @@ histórico deixa de ser prova.
 mais: quem entra pode fazer tudo o que a máquina de estados permite. Aprovar
 exceção de preço, por exemplo, devia ser do Supervisor e hoje é de qualquer um.
 
-**Trocar a própria senha pela tela.** Hoje passa por quem tem acesso à CLI.
+**Recuperar senha esquecida sem passar por alguém.** Não há envio de e-mail:
+quem esquece pede um reset pela CLI e troca na entrada seguinte.
 
 **A busca por nome e o resumo da cobrança moram fora do design.**
 `src/telas/LocalizarCliente.tsx` e `src/telas/ResumoDaCobranca.tsx` são compostos

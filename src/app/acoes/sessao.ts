@@ -21,12 +21,12 @@ export async function usuarioAtual(): Promise<UsuarioDaSessao | null> {
   if (!segredo) return null
 
   const cookie = (await cookies()).get(NOME_DO_COOKIE)?.value
-  const id = await usuarioDaSessao(cookie, segredo)
-  if (id === null) return null
+  const sessao = await usuarioDaSessao(cookie, segredo)
+  if (!sessao) return null
 
   // Confere `ativo` a cada uso: o proxy não consegue, e sem isto quem foi
   // desativado continuaria trabalhando até o cookie vencer.
-  return usuarioAtivo(id)
+  return usuarioAtivo(sessao.usuarioId)
 }
 
 /**
@@ -38,5 +38,13 @@ export async function usuarioAtual(): Promise<UsuarioDaSessao | null> {
 export async function exigirUsuario(): Promise<UsuarioDaSessao> {
   const usuario = await usuarioAtual()
   if (!usuario) throw new Error('Sessão expirada. Entre de novo para continuar.')
+
+  // Segunda trava, no banco. O proxy já barra a navegação pelo aviso assinado
+  // no cookie, mas o cookie é de oito horas: se alguém tiver a senha resetada
+  // no meio da sessão, é aqui que a escrita para. E uma ação chamada
+  // diretamente, sem passar por tela nenhuma, também passa por aqui.
+  if (usuario.precisaTrocarSenha) {
+    throw new Error('Troque a senha de estreia antes de continuar.')
+  }
   return usuario
 }

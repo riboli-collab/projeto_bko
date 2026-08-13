@@ -11,13 +11,15 @@ import { normalizarUsuario } from '@/consultas/usuarios'
  * cadastro de usuário seria mais superfície para manter do que o problema pede.
  * Quando houver rotatividade que justifique, vira tela.
  *
- * A senha é **sorteada aqui e mostrada uma vez**. Não há como recuperá-la
- * depois — só sortear outra. Isto é intencional: o banco guarda scrypt, e um
- * banco de onde se lê a senha de volta é um banco que vaza a senha junto.
+ * Sem senha no comando, ela é **sorteada e mostrada uma vez**. Não há como
+ * recuperá-la depois — só sortear outra. Isto é intencional: o banco guarda
+ * scrypt, e um banco de onde se lê a senha de volta é um banco que vaza a senha
+ * junto. Passando a senha no comando, ela é definida como veio.
  *
  *   npx tsx --env-file=.env.local scripts/usuarios.ts listar
  *   npx tsx --env-file=.env.local scripts/usuarios.ts criar raquel "Raquel" Liderança
  *   npx tsx --env-file=.env.local scripts/usuarios.ts senha raquel
+ *   npx tsx --env-file=.env.local scripts/usuarios.ts senha raquel 123456
  *   npx tsx --env-file=.env.local scripts/usuarios.ts desativar raquel
  *   npx tsx --env-file=.env.local scripts/usuarios.ts ativar raquel
  */
@@ -25,11 +27,33 @@ import { normalizarUsuario } from '@/consultas/usuarios'
 const USO = `
 Uso:
   listar
-  criar <usuario> "<Nome completo>" <Papel>
-  senha <usuario>                     sorteia uma nova e mostra uma vez
+  criar <usuario> "<Nome completo>" <Papel> [senha]
+  senha <usuario> [senha]             sem a senha, sorteia uma e mostra uma vez
   desativar <usuario>                 tira o acesso, preserva o histórico
   ativar <usuario>
 `.trim()
+
+/**
+ * As senhas que qualquer lista de ataque tenta primeiro.
+ *
+ * Não recusa nada — quem administra decide. Mas dizer em voz alta é diferente
+ * de deixar passar em silêncio: uma senha padrão numa URL pública é a porta
+ * aberta mais comum que existe, e quem definir uma precisa ter escolhido isso,
+ * não ter esbarrado nisso.
+ */
+const CONHECIDAS = [
+  '123456', '1234', '12345', '1234567', '12345678', '123456789',
+  'senha', 'password', 'admin', 'mudar123', 'qwerty', 'abc123',
+]
+
+function avisarSeFraca(senha: string) {
+  const fraca = CONHECIDAS.includes(senha.toLowerCase()) || senha.length < 8
+  if (!fraca) return
+  console.warn('')
+  console.warn('  AVISO: esta senha está nas listas de ataque ou é curta demais.')
+  console.warn('  A Esteira fica numa URL pública e guarda CPF, e-mail e telefone')
+  console.warn('  de clientes. Vale como senha temporária, não como definitiva.')
+}
 
 function encerrar(mensagem: string, codigo = 1): never {
   console.error(mensagem)
@@ -63,16 +87,21 @@ async function listar() {
 }
 
 /** A senha aparece uma vez e só. Repetida em log ou histórico, deixa de ser senha. */
-function anunciarSenha(usuario: string, senha: string) {
+function anunciarSenha(usuario: string, senha: string, sorteada: boolean) {
   console.log('')
   console.log(`  usuário: ${usuario}`)
   console.log(`  senha:   ${senha}`)
   console.log('')
-  console.log('  Entregue por um canal que a pessoa controle e peça que ela não a compartilhe.')
-  console.log('  Não há como recuperá-la depois — só sortear outra com `senha`.')
+  if (sorteada) {
+    console.log('  Entregue por um canal que a pessoa controle e peça que ela não a compartilhe.')
+    console.log('  Não há como recuperá-la depois — só sortear outra com `senha`.')
+  } else {
+    console.log('  Definida por quem administra. Não há como lê-la de volta do banco.')
+  }
+  avisarSeFraca(senha)
 }
 
-async function criar(usuario: string, nome: string, papel: string) {
+async function criar(usuario: string, nome: string, papel: string, definida?: string) {
   if (!usuario || !nome || !papel) encerrar(USO)
   const chave = normalizarUsuario(usuario)
   if (!/^[a-z][a-z0-9.-]{1,30}$/.test(chave)) {
@@ -83,27 +112,32 @@ async function criar(usuario: string, nome: string, papel: string) {
     .where(eq(usuarios.usuario, chave))
   if (existe) encerrar(`Já existe o usuário "${chave}". Para trocar a senha, use \`senha ${chave}\`.`)
 
-  const senha = senhaSorteada()
+  const senha = definida || senhaSorteada()
   await db.insert(usuarios).values({
     usuario: chave, nome: nome.trim(), papel: papel.trim(), senhaHash: await gerarHash(senha),
+    // Toda senha que quem administra conhece é de estreia. A pessoa troca na
+    // primeira entrada, e a partir dali ninguém mais sabe a senha dela.
+    precisaTrocarSenha: true,
   })
 
   console.log(`Criado: ${nome.trim()} (${papel.trim()}).`)
-  anunciarSenha(chave, senha)
+  anunciarSenha(chave, senha, !definida)
 }
 
-async function trocarSenha(usuario: string) {
+async function trocarSenha(usuario: string, definida?: string) {
   const chave = normalizarUsuario(usuario)
-  const senha = senhaSorteada()
+  const senha = definida || senhaSorteada()
   const alterados = await db.update(usuarios)
-    .set({ senhaHash: await gerarHash(senha) })
+    // Volta a ser de estreia: quem administra acabou de conhecer esta senha, e
+    // a pessoa troca na próxima entrada.
+    .set({ senhaHash: await gerarHash(senha), precisaTrocarSenha: true })
     .where(eq(usuarios.usuario, chave)).returning({ nome: usuarios.nome })
 
   if (!alterados.length) encerrar(`Não existe o usuário "${chave}".`)
-  console.log(`Nova senha para ${alterados[0].nome}.`)
+  console.log(`Nova senha para ${alterados[0].nome}. Ela troca na próxima entrada.`)
   // A sessão aberta continua valendo: ela é assinada com SEGREDO_DA_SESSAO, não
   // com a senha. Para derrubar todas as sessões de todo mundo, troque o segredo.
-  anunciarSenha(chave, senha)
+  anunciarSenha(chave, senha, !definida)
 }
 
 async function marcarAtivo(usuario: string, ativo: boolean) {
@@ -124,8 +158,8 @@ async function main() {
 
   switch (comando) {
     case 'listar': await listar(); break
-    case 'criar': await criar(resto[0], resto[1], resto[2]); break
-    case 'senha': await trocarSenha(resto[0]); break
+    case 'criar': await criar(resto[0], resto[1], resto[2], resto[3]); break
+    case 'senha': await trocarSenha(resto[0], resto[1]); break
     case 'desativar': await marcarAtivo(resto[0], false); break
     case 'ativar': await marcarAtivo(resto[0], true); break
     default: encerrar(USO)

@@ -35,12 +35,30 @@ export async function criarUsuariosDeTeste() {
     [USUARIO_DO_TESTE, NOME_DO_TESTE], [OUTRO_USUARIO, OUTRO_NOME],
   ]) {
     await sql`
-      insert into usuarios (usuario, nome, papel, senha_hash, ativo)
-      values (${usuario}, ${nome}, ${PAPEL_DO_TESTE}, ${hash}, true)
+      insert into usuarios (usuario, nome, papel, senha_hash, ativo, precisa_trocar_senha)
+      values (${usuario}, ${nome}, ${PAPEL_DO_TESTE}, ${hash}, true, false)
       on conflict (usuario) do update set
-        nome = excluded.nome, senha_hash = excluded.senha_hash, ativo = true`
+        nome = excluded.nome, senha_hash = excluded.senha_hash, ativo = true,
+        -- Já trocaram: os specs do fluxo testam o trabalho, não a estreia.
+        -- Quem testa a estreia é troca-de-senha.spec.ts, que marca de volta.
+        precisa_trocar_senha = false`
   }
   await sql.end()
+}
+
+/** Devolve a conta ao estado de estreia: senha definida por quem administra. */
+export async function marcarSenhaDeEstreia(usuario: string) {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  await sql`update usuarios set precisa_trocar_senha = true where usuario = ${usuario}`
+  await sql.end()
+}
+
+/** Lê o estado da conta direto do banco: a tela não prova o que foi gravado. */
+export async function lerUsuario(usuario: string) {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const [u] = await sql`select * from usuarios where usuario = ${usuario}`
+  await sql.end()
+  return u
 }
 
 export async function desativarUsuario(usuario: string) {

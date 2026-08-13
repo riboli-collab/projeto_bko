@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { emitirSessao, DURACAO_MS, NOME_DO_COOKIE } from '@/dominio/sessao'
+import { emitirSessao, DURACAO_MS, NOME_DO_COOKIE, TROCA_DE_SENHA } from '@/dominio/sessao'
 import { conferirSenha } from '@/dominio/senha'
 import { credenciais, marcarAcesso } from '@/consultas/usuarios'
 
@@ -38,7 +38,10 @@ export async function entrar(_anterior: unknown, formulario: FormData) {
   if (!conta || !conta.ativo || !senhaConfere) return RECUSA
 
   const cookieStore = await cookies()
-  cookieStore.set(NOME_DO_COOKIE, await emitirSessao(conta.id, segredo), {
+  // O aviso de troca entra no cookie assinado: é assim que o proxy sabe, no
+  // Edge, que só a tela de troca pode abrir para esta pessoa.
+  const sessao = { usuarioId: conta.id, precisaTrocarSenha: conta.precisaTrocarSenha }
+  cookieStore.set(NOME_DO_COOKIE, await emitirSessao(sessao, segredo), {
     httpOnly: true,               // JavaScript da página não lê a sessão
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
@@ -46,6 +49,10 @@ export async function entrar(_anterior: unknown, formulario: FormData) {
     maxAge: DURACAO_MS / 1000,
   })
   await marcarAcesso(conta.id)
+
+  // Quem ainda usa a senha de estreia vai para a troca, não para onde ia. O
+  // proxy redirecionaria de qualquer forma; mandar direto evita um salto a mais.
+  if (conta.precisaTrocarSenha) redirect(TROCA_DE_SENHA)
 
   // Só caminho interno: `?de=https://outro.site` viraria redirecionamento aberto.
   redirect(de.startsWith('/') && !de.startsWith('//') ? de : '/painel')

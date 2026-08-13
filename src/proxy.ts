@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { NOME_DO_COOKIE, ehAberto, usuarioDaSessao } from '@/dominio/sessao'
+import { NOME_DO_COOKIE, TROCA_DE_SENHA, ehAberto, usuarioDaSessao } from '@/dominio/sessao'
 
 /**
  * A porta.
@@ -42,8 +42,20 @@ export async function proxy(requisicao: NextRequest) {
   const segredo = process.env.SEGREDO_DA_SESSAO
   if (!segredo) return paraAEntrada(requisicao)
 
-  const id = await usuarioDaSessao(requisicao.cookies.get(NOME_DO_COOKIE)?.value, segredo)
-  return id === null ? paraAEntrada(requisicao) : seguir(requisicao)
+  const sessao = await usuarioDaSessao(requisicao.cookies.get(NOME_DO_COOKIE)?.value, segredo)
+  if (!sessao) return paraAEntrada(requisicao)
+
+  // Enquanto a senha for a que quem administra definiu, a única tela que abre é
+  // a da troca. O aviso vem assinado dentro do cookie — o Edge não tem banco
+  // para perguntar, e editar o cookie quebra a assinatura.
+  if (sessao.precisaTrocarSenha && requisicao.nextUrl.pathname !== TROCA_DE_SENHA) {
+    const destino = requisicao.nextUrl.clone()
+    destino.pathname = TROCA_DE_SENHA
+    destino.search = ''
+    return NextResponse.redirect(destino)
+  }
+
+  return seguir(requisicao)
 }
 
 export const config = {
