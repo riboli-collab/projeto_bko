@@ -62,9 +62,6 @@ function temConteudo(r: Record<string, any>, campo: CampoId): boolean {
   }
 }
 
-/** Enquanto não há seletor de pessoa (Tarefa 22), o autor é fixo e declarado. */
-const QUEM = 'Carlos'
-
 const RASCUNHO_VAZIO = {
   cnpjCpf: '', razaoSocial: '', enderecoFiscal: { ...ENDERECO_VAZIO }, contato: '',
   telefone: '', emailAssinatura: '', emailFinanceiro: '',
@@ -224,7 +221,7 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
           // passa a valer o que a base guarda — senão a tela mostraria o digitado
           // e o pedido nasceria com ele, que é justamente o que a regra recusa.
           setRascunho((r: any) => ({ ...r, ...valoresDaBase(lista) }))
-          iniciar(async () => { await registrarDivergencias(rascunho.cnpjCpf, lista, QUEM) })
+          iniciar(async () => { await registrarDivergencias(rascunho.cnpjCpf, lista) })
         }}
         // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
         camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
@@ -234,8 +231,7 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
           const dados = new FormData()
           dados.set('rascunhoId', rascunhoId)
           dados.set('documentoId', documentoId)
-          dados.set('quem', QUEM)
-          dados.set('arquivo', arquivo)
+            dados.set('arquivo', arquivo)
           const r = await anexarDocumento(dados)
           if (r.ok) {
             setAnexos((atual) => [...atual.filter((a) => a.documentoId !== documentoId), r.anexo])
@@ -264,11 +260,8 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
             ...rascunho,
             rascunhoId,
             tipo: rascunho.tipoDeAcao,
-            // `vendedor` está no modelo do PRD e NÃO existe no formulário
-            // desenhado — não é um dos 17 campos. Até haver decisão, ele é quem
-            // preencheu: é a única resposta que não inventa nome de vendedor.
-            // A Tarefa 22 troca a constante pelo seletor de pessoa.
-            vendedor: QUEM,
+            // `vendedor` NÃO vai daqui. Ele sai da sessão, no servidor: mandado
+            // pelo navegador, dava para criar pedido no nome de outra pessoa.
           })
           if (r.ok) {
             setCamposFaltantes({})

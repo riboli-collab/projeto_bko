@@ -3,16 +3,25 @@
 import { useActionState } from 'react'
 import { entrar } from '@/app/acoes/entrar'
 
+const CONTROLE =
+  'mt-1.5 w-full rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 text-slate-900 dark:text-slate-100'
+
+const NORMAL = 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950'
+const COM_ERRO = 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30'
+
 /**
- * A tela de senha.
+ * A tela de entrada.
  *
- * Não veio do pacote de design — não existe seção desenhada para ela, porque a
- * Esteira foi desenhada para ter autenticação por pessoa (Tarefa 22), não uma
- * senha compartilhada. É infraestrutura provisória, e por isso usa só os tokens
- * do sistema, sem inventar componente novo que depois teria de ser desfeito.
+ * Não veio do pacote de design — não existe seção desenhada para ela. Usa só os
+ * tokens do sistema, sem inventar componente novo.
+ *
+ * O erro é um só para usuário inexistente, senha errada e conta desativada, e
+ * fica preso ao campo de senha por `aria-describedby`. Mensagens diferentes
+ * transformariam a tela num verificador de quem trabalha aqui.
  */
 export function FormularioDeEntrada({ de }: { de: string }) {
   const [estado, acao, enviando] = useActionState(entrar, null as { erro?: string } | null)
+  const erro = Boolean(estado?.erro)
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-white p-6 dark:bg-slate-950">
@@ -27,30 +36,45 @@ export function FormularioDeEntrada({ de }: { de: string }) {
         <input type="hidden" name="de" value={de} />
 
         <label
-          htmlFor="senha"
+          htmlFor="usuario"
           className="mt-6 block text-sm font-medium text-slate-700 dark:text-slate-300"
         >
-          Senha de acesso
+          Usuário
+        </label>
+        <input
+          id="usuario"
+          name="usuario"
+          type="text"
+          autoFocus
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
+          aria-invalid={erro}
+          aria-describedby={erro ? 'entrada-erro' : undefined}
+          className={`${CONTROLE} ${erro ? COM_ERRO : NORMAL}`}
+        />
+
+        <label
+          htmlFor="senha"
+          className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-300"
+        >
+          Senha
         </label>
         <input
           id="senha"
           name="senha"
           type="password"
-          autoFocus
           autoComplete="current-password"
           required
-          aria-invalid={Boolean(estado?.erro)}
-          aria-describedby={estado?.erro ? 'senha-erro' : undefined}
-          className={`mt-1.5 w-full rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 ${
-            estado?.erro
-              ? 'border-red-300 bg-red-50/60 dark:border-red-900 dark:bg-red-950/30'
-              : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950'
-          } text-slate-900 dark:text-slate-100`}
+          aria-invalid={erro}
+          aria-describedby={erro ? 'entrada-erro' : undefined}
+          className={`${CONTROLE} ${erro ? COM_ERRO : NORMAL}`}
         />
 
-        {estado?.erro && (
-          <p id="senha-erro" role="alert" className="mt-1.5 text-xs text-red-700 dark:text-red-400">
-            {estado.erro}
+        {erro && (
+          <p id="entrada-erro" role="alert" className="mt-1.5 text-xs text-red-700 dark:text-red-400">
+            {estado?.erro}
           </p>
         )}
 
@@ -63,8 +87,8 @@ export function FormularioDeEntrada({ de }: { de: string }) {
         </button>
 
         <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-          Senha única da equipe, provisória. Ela protege o acesso, mas não
-          identifica quem mexeu — o histórico ainda grava um autor fixo.
+          Cada pessoa tem o seu. O que você fizer fica assinado com o seu nome no
+          histórico do pedido.
         </p>
       </form>
     </main>

@@ -15,12 +15,17 @@ Precisa de Docker e Node 20 ou mais novo.
 
 ```bash
 docker compose up -d          # Postgres 17 em localhost:5432
-cp .env.example .env.local    # ajuste DATABASE_URL
+cp .env.example .env.local    # ajuste DATABASE_URL e SEGREDO_DA_SESSAO
 npm install
-npm run migrar                # cria as nove tabelas
+npm run migrar                # cria as dez tabelas
 npm run carregar              # carrega clientes e planos de ../dados
+npm run usuarios criar voce "Seu Nome" BKO    # a senha aparece uma vez
 npm run dev                   # http://localhost:3000
 ```
+
+Sem usuário não se entra — nem local. É de propósito: um modo aberto que só
+existe na máquina de quem desenvolve é um modo que ninguém testa e que um dia
+vai para produção por engano.
 
 `npm run carregar` lê `../dados`, que **não faz parte deste repositório**: são
 CSVs com CPF, e-mail e telefone de clientes reais. Para subir só o catálogo de
@@ -29,7 +34,7 @@ planos, que é dado de negócio, use `npx tsx scripts/carregar-planos.ts`.
 ## Como verificar
 
 ```bash
-npm run verificar             # 156 testes de unidade + 61 de fluxo
+npm run verificar             # 168 testes de unidade + 69 de fluxo
 ```
 
 Os testes de fluxo sobem o app na porta 3100 e rodam contra o Postgres de
@@ -83,26 +88,49 @@ social, RG e comprovante de residência, que nunca entram no repositório.
 - Todas as páginas são `force-dynamic`. O layout raiz consulta o banco para o
   contador da barra lateral, então nada sob ele pode ser pré-gerado.
 
-## Acesso
+## Quem entra, e como
 
-Há uma senha única de equipe, em `SENHA_DE_ACESSO`. Sem a variável definida a
-Esteira fica aberta — é o que permite rodar local sem cerimônia; com ela, toda
-rota passa por `src/proxy.ts`, menos `/entrar` e `/saude`.
+Cada pessoa tem usuário e senha própria, na tabela `usuarios`. A senha é
+guardada com scrypt e sal (`src/dominio/senha.ts`) — nunca em texto. Não há
+tela de administração: são seis pessoas num escritório, e a gestão é por CLI.
 
-O cookie guarda `validade.assinatura`, nunca a senha: a assinatura é HMAC-SHA256
-com a própria senha como chave, então trocá-la derruba todas as sessões
-abertas. Dura oito horas — um turno.
+```bash
+npm run usuarios listar
+npm run usuarios criar hiago "Hiago Ferreira" BKO
+npm run usuarios senha hiago          # sorteia outra e mostra uma vez
+npm run usuarios desativar hiago      # tira o acesso, preserva o histórico
+```
+
+A senha sorteada aparece **uma vez** e não há como recuperá-la — só sortear
+outra. Um banco de onde se lê a senha de volta é um banco que vaza a senha
+junto.
+
+O cookie é `id.validade.assinatura`, assinado com `SEGREDO_DA_SESSAO`. Ele diz
+**quem** entrou: é daí que sai o autor de cada transição. Dura oito horas — um
+turno. Trocar o segredo derruba todas as sessões de todo mundo, e é o botão de
+pânico; trocar a senha de uma pessoa **não** derruba a sessão dela, porque a
+assinatura não usa a senha.
 
 `/saude` fica fora da tranca de propósito. É por onde o Railway pergunta se o
 app subiu, e ele não digita senha: protegendo, todo deploy seria reprovado no
 healthcheck e revertido, com a aplicação funcionando.
 
+### O autor nunca vem do navegador
+
+`src/app/acoes/sessao.ts` resolve quem está agindo a partir do cookie, no
+servidor. Antes, `mudarSituacao` recebia `quem` e `criarPedido` recebia
+`vendedor` como argumento — e argumento de Server Action vem do navegador:
+qualquer um com o console aberto assinava a transição com o nome de um colega.
+Se algum dia uma ação de escrita voltar a aceitar o autor como parâmetro, o
+histórico deixa de ser prova.
+
 ## O que ainda não existe
 
-**Autenticação por pessoa.** A senha protege o acesso, mas não identifica quem
-mexeu: o autor das transições continua sendo a constante `QUEM = 'Carlos'` no
-adaptador. Enquanto for assim, o histórico registra *quando* e *o quê*, não
-*quem* — e é o *quem* que torna o checklist auditável.
+**Papel que restringe alguma coisa.** `papel` é etiqueta no menu lateral e nada
+mais: quem entra pode fazer tudo o que a máquina de estados permite. Aprovar
+exceção de preço, por exemplo, devia ser do Supervisor e hoje é de qualquer um.
+
+**Trocar a própria senha pela tela.** Hoje passa por quem tem acesso à CLI.
 
 **A busca por nome e o resumo da cobrança moram fora do design.**
 `src/telas/LocalizarCliente.tsx` e `src/telas/ResumoDaCobranca.tsx` são compostos

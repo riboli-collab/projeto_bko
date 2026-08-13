@@ -1,14 +1,14 @@
 import { defineConfig } from '@playwright/test'
 // O processo de teste também fala com o banco: ele limpa a própria fixture.
 import './testes/carregar-env'
-import { SENHA_DO_TESTE, ARQUIVO_DE_SESSAO } from './testes/fluxo/constantes'
+import { SEGREDO_DO_TESTE, ARQUIVO_DE_SESSAO } from './testes/fluxo/constantes'
 
 /**
- * A suíte roda com a tranca **ligada**, como em produção.
+ * A suíte roda **autenticada**, como em produção.
  *
- * O projeto `autenticar` entra uma vez e guarda a sessão; os specs do fluxo a
- * reusam e nem sabem que existe senha. `acesso` roda por último, sem sessão
- * nenhuma, porque é ele que testa a porta trancada.
+ * O projeto `autenticar` cria as pessoas de teste, entra uma vez e guarda a
+ * sessão; os specs do fluxo a reusam e nem sabem que existe login. `acesso`
+ * roda sem sessão nenhuma, porque é ele que testa a porta trancada.
  */
 export default defineConfig({
   testDir: './testes/fluxo',
@@ -33,7 +33,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `SENHA_DE_ACESSO='${SENHA_DO_TESTE}' npm run dev -- --port 3100`,
+    command: `SEGREDO_DA_SESSAO='${SEGREDO_DO_TESTE}' npm run dev -- --port 3100`,
     // Pela saúde, que é a única rota aberta: esperar por `/painel` daria 307
     // para `/entrar`, e o Playwright desistiria antes de o app subir.
     url: 'http://localhost:3100/saude',

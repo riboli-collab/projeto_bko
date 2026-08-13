@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db/cliente'
 import { anexos } from '@/db/schema'
 import type { DocumentoId } from '@/dominio/documentos'
+import { exigirUsuario } from './sessao'
 
 /**
  * Fora de `public/`: nada aqui é servido por URL estática.
@@ -25,9 +26,10 @@ function nomeSeguro(nome: string): string {
 }
 
 export async function anexarDocumento(dados: FormData) {
+  // Quem anexou vem da sessão. Era um campo do FormData, que o navegador monta.
+  const { nome: quem } = await exigirUsuario()
   const rascunhoId = String(dados.get('rascunhoId') ?? '')
   const documentoId = String(dados.get('documentoId') ?? '') as DocumentoId
-  const quem = String(dados.get('quem') ?? '')
   const arquivo = dados.get('arquivo')
 
   if (!/^[a-f0-9-]{36}$/.test(rascunhoId)) {

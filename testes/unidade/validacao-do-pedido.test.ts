@@ -15,7 +15,7 @@ const VALIDO: EntradaDePedido = {
   precoVenda: 49.9, valorDoChip: 0, empresaFaturadora: 'IG', tipo: 'Linha nova',
   tipoDeChip: 'Físico', formaDeEntrega: 'Motoboy',
   enderecoDeEntrega: { ...ENDERECO, recebedor: 'Fernando Ribeiro' },
-  dataPortabilidade: null, vendedor: 'Carlos', observacao: '',
+  dataPortabilidade: null, observacao: '',
   rascunhoId: '00000000-0000-4000-8000-000000000000',
 }
 

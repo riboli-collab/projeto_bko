@@ -9,9 +9,6 @@ import { abrirPendencia, responderPendencia } from '@/app/acoes/pendencias'
 import type { DadosDoStatus } from '@/consultas/pedido'
 import type { SituacaoId } from '@/dominio/tipos'
 
-/** Enquanto não há login, o autor é fixo e declarado. Ver R3 do PRD. */
-const QUEM = 'Raquel'
-
 export function TelaStatus({ dados }: { dados: DadosDoStatus }) {
   const router = useRouter()
   const [erro, setErro] = useState<string | null>(null)
@@ -37,11 +34,11 @@ export function TelaStatus({ dados }: { dados: DadosDoStatus }) {
         isLoading={gravando}
         erro={erro}
         onMudarSituacao={(id: SituacaoId, motivo: string) =>
-          executar(() => mudarSituacao(dados.pedido.numero, id, motivo, QUEM))}
+          executar(() => mudarSituacao(dados.pedido.numero, id, motivo))}
         onAbrirPendencia={(pergunta, dono) =>
-          executar(() => abrirPendencia(dados.pedido.numero, pergunta, dono, QUEM))}
+          executar(() => abrirPendencia(dados.pedido.numero, pergunta, dono))}
         onResponderPendencia={(id, resposta, ehRegra) =>
-          executar(() => responderPendencia(Number(id), resposta, ehRegra, QUEM))}
+          executar(() => responderPendencia(Number(id), resposta, ehRegra))}
         onVoltarParaLista={() => router.push('/pedidos')}
       />
 

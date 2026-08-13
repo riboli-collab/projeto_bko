@@ -1,25 +1,32 @@
 /**
- * A sessão de acesso, enquanto não existe autenticação de verdade.
+ * A sessão de uma pessoa.
  *
- * Isto **não é** login: não há usuário, não há papel, e o autor das transições
- * continua sendo a constante do adaptador. É uma tranca na porta, para a URL
- * pública não ficar aberta a quem passar. A autenticação por pessoa é a
- * Tarefa 22, e é ela que torna o histórico auditável.
+ * O cookie é `id.validade.assinatura`, onde a assinatura é HMAC-SHA256 de
+ * `id.validade` com `SEGREDO_DA_SESSAO`. Ele diz **quem** entrou, e é isso que
+ * torna o histórico auditável: o autor de cada transição sai daqui, não de uma
+ * constante no adaptador nem de um campo que o navegador manda.
  *
- * O cookie guarda `validade.assinatura`, nunca a senha. Assinatura é
- * HMAC-SHA256 com a própria senha como chave — trocar a senha invalida toda
- * sessão em aberto, que é o comportamento desejado. Escrito com Web Crypto
- * porque o middleware roda no runtime Edge, onde `node:crypto` não existe.
+ * A assinatura usa um segredo do servidor, e não a senha da pessoa, por dois
+ * motivos. O proxy precisa validar a sessão no runtime Edge, onde não há banco
+ * para buscar o hash de cada usuário — e a senha da pessoa não deve viajar
+ * como chave de nada além do próprio login. Trocar o segredo derruba todas as
+ * sessões de todo mundo, que é o botão de pânico.
+ *
+ * Escrito com Web Crypto porque o proxy roda no Edge, onde `node:crypto` não
+ * existe. `dominio/senha.ts`, que usa scrypt do Node, **não** pode ser
+ * importado a partir daqui nem do proxy.
  */
 
 const ALGORITMO = { name: 'HMAC', hash: 'SHA-256' } as const
 
-/** Oito horas: um turno. Quem trabalha o dia inteiro digita a senha uma vez. */
+/** Oito horas: um turno. Quem trabalha o dia inteiro entra uma vez. */
 export const DURACAO_MS = 8 * 60 * 60 * 1000
 
-async function chave(senha: string): Promise<CryptoKey> {
+export const NOME_DO_COOKIE = 'esteira_sessao'
+
+async function chave(segredo: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(senha), ALGORITMO, false, ['sign', 'verify'],
+    'raw', new TextEncoder().encode(segredo), ALGORITMO, false, ['sign', 'verify'],
   )
 }
 
@@ -32,40 +39,60 @@ const deHex = (s: string) => {
   return bytes
 }
 
-/** Emite o valor do cookie para uma senha correta. `agora` entra para o teste. */
-export async function emitirSessao(senha: string, agora = Date.now()): Promise<string> {
-  const validade = String(agora + DURACAO_MS)
-  const assinatura = await crypto.subtle.sign(ALGORITMO, await chave(senha), new TextEncoder().encode(validade))
-  return `${validade}.${paraHex(assinatura)}`
+/** Emite o cookie para um usuário já autenticado. `agora` entra para o teste. */
+export async function emitirSessao(
+  usuarioId: number, segredo: string, agora = Date.now(),
+): Promise<string> {
+  const corpo = `${usuarioId}.${agora + DURACAO_MS}`
+  const assinatura = await crypto.subtle.sign(
+    ALGORITMO, await chave(segredo), new TextEncoder().encode(corpo),
+  )
+  return `${corpo}.${paraHex(assinatura)}`
 }
 
 /**
- * Diz se o cookie vale. Devolve `false` para qualquer coisa estranha — formato
- * errado, assinatura que não bate, prazo vencido — sem distinguir os casos: a
- * diferença só serviria para quem está tentando adivinhar.
+ * Devolve o id de quem está na sessão, ou `null`.
+ *
+ * `null` para qualquer coisa estranha — formato errado, assinatura que não
+ * bate, prazo vencido — sem distinguir os casos: a diferença só serviria para
+ * quem está tentando adivinhar.
+ *
+ * Note que isto **não** consulta o banco: o proxy roda no Edge e valida milhares
+ * de requisições. Quem precisa do nome ou do papel busca depois, no servidor.
+ * A consequência é que desativar alguém só faz efeito na próxima sessão — por
+ * isso `exigirUsuario` confere `ativo` a cada ação que escreve.
  */
-export async function sessaoValida(
-  cookie: string | undefined, senha: string, agora = Date.now(),
-): Promise<boolean> {
-  if (!cookie) return false
-  const [validade, assinatura] = cookie.split('.')
-  if (!validade || !assinatura || !/^\d+$/.test(validade) || !/^[0-9a-f]+$/.test(assinatura)) return false
-  if (Number(validade) < agora) return false
+export async function usuarioDaSessao(
+  cookie: string | undefined, segredo: string, agora = Date.now(),
+): Promise<number | null> {
+  if (!cookie) return null
+  // Segredo vazio recusa em vez de estourar: `importKey` lança DataError com
+  // chave de comprimento zero, e uma variável definida como string vazia
+  // derrubaria toda requisição com erro 500 em vez de mandar para a entrada.
+  if (!segredo) return null
+
+  const partes = cookie.split('.')
+  if (partes.length !== 3) return null
+  const [id, validade, assinatura] = partes
+
+  if (!/^\d+$/.test(id) || !/^\d+$/.test(validade) || !/^[0-9a-f]+$/.test(assinatura)) return null
+  if (Number(validade) < agora) return null
 
   // `verify` do Web Crypto compara em tempo constante.
-  return crypto.subtle.verify(
-    ALGORITMO, await chave(senha), deHex(assinatura), new TextEncoder().encode(validade),
+  const confere = await crypto.subtle.verify(
+    ALGORITMO, await chave(segredo), deHex(assinatura),
+    new TextEncoder().encode(`${id}.${validade}`),
   ).catch(() => false)
-}
 
-export const NOME_DO_COOKIE = 'esteira_sessao'
+  return confere ? Number(id) : null
+}
 
 /**
  * Caminhos que a tranca não cobre.
  *
  * `/saude` fica de fora porque é por onde o Railway pergunta se o app subiu, e
  * ele não tem como digitar senha: protegendo, todo deploy seria reprovado no
- * healthcheck e revertido.
+ * healthcheck e revertido, com a aplicação funcionando.
  */
 export const ABERTOS = ['/entrar', '/saude']
 

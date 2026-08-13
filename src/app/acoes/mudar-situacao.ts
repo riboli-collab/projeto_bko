@@ -7,10 +7,20 @@ import { pedidos, historicoDeSituacao } from '@/db/schema'
 import { validarTransicao } from '@/dominio/maquina-de-estados'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
 import type { SituacaoId, TipoDePedido } from '@/dominio/tipos'
+import { exigirUsuario } from './sessao'
 
+/**
+ * `quem` não é parâmetro: sai da sessão.
+ *
+ * Argumento de Server Action vem do navegador. Recebendo o autor de fora, uma
+ * chamada forjada assinaria a transição com o nome de qualquer colega — e o
+ * histórico, que existe para ser prova, viraria opinião.
+ */
 export async function mudarSituacao(
-  numero: string, destino: SituacaoId, motivo: string, quem: string,
+  numero: string, destino: SituacaoId, motivo: string,
 ) {
+  const { nome: quem } = await exigirUsuario()
+
   return await db.transaction(async (tx) => {
     const [p] = await tx.select().from(pedidos).where(eq(pedidos.numero, numero))
     if (!p) return { ok: false as const, motivo: 'Pedido não encontrado.' }

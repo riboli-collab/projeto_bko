@@ -11,6 +11,7 @@ import { validarPedido } from '@/dominio/validacao-do-pedido'
 import { faltamDocumentos, motivoDoBloqueio } from '@/dominio/documentos'
 import { listarAnexos, amarrarAnexosAoPedido } from '@/app/acoes/documentos'
 import { SITUACOES } from '@/dominio/situacoes'
+import { exigirUsuario } from '@/app/acoes/sessao'
 import type { Operadora, EmpresaFaturadora, TipoDePedido, TipoDeChip, FormaDeEntrega, CanalDeVenda, SituacaoId, Endereco, EnderecoDeEntrega } from '@/dominio/tipos'
 
 export interface EntradaDePedido {
@@ -33,7 +34,6 @@ export interface EntradaDePedido {
   formaDeEntrega: FormaDeEntrega | null
   enderecoDeEntrega: EnderecoDeEntrega | null
   dataPortabilidade: string | null
-  vendedor: string
   observacao: string
   /** Onde os anexos estão pendurados até o pedido ter número. */
   rascunhoId: string
@@ -42,6 +42,10 @@ export interface EntradaDePedido {
 const ENCERRADOS: SituacaoId[] = SITUACOES.filter((s) => s.encerra).map((s) => s.id)
 
 export async function criarPedido(entrada: EntradaDePedido) {
+  // O vendedor é quem está logado. Era um campo da entrada, vindo do navegador:
+  // dava para criar pedido no nome de outra pessoa sem sair do console.
+  const { nome: vendedor } = await exigirUsuario()
+
   // Todos os erros de campo de uma vez, com os identificadores que o componente
   // sabe destacar. O preço fica de fora porque é a única regra que precisa do banco.
   const erros: Record<string, string> = { ...validarPedido(entrada) }
@@ -137,7 +141,7 @@ export async function criarPedido(entrada: EntradaDePedido) {
       formaDeEntrega: entrada.formaDeEntrega,
       enderecoDeEntrega: entrada.enderecoDeEntrega,
       dataPortabilidade: entrada.dataPortabilidade,
-      vendedor: entrada.vendedor,
+      vendedor,
       observacao: entrada.observacao,
       dataEntrada: agora, dataSituacao: agora,
     })
@@ -145,7 +149,7 @@ export async function criarPedido(entrada: EntradaDePedido) {
     // Primeira linha do histórico: `de` nulo — o pedido não veio de situação nenhuma, nasceu.
     await tx.insert(historicoDeSituacao).values({
       numeroDoPedido: numero, de: null, para: 'PEDIDO_DO_COMERCIAL',
-      quando: agora, quem: entrada.vendedor, motivo: '', diasNaSituacao: 0, estourouOPrazo: false,
+      quando: agora, quem: vendedor, motivo: '', diasNaSituacao: 0, estourouOPrazo: false,
     })
 
     return { ok: true as const, numero, responsavel }

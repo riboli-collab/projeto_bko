@@ -5,10 +5,14 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/db/cliente'
 import { pedidos, pendencias } from '@/db/schema'
 import type { SituacaoId } from '@/dominio/tipos'
+import { exigirUsuario } from './sessao'
 
+/** Quem abre sai da sessão, não da tela. Ver `mudarSituacao`. */
 export async function abrirPendencia(
-  numero: string, pergunta: string, dono: string, quem: string,
+  numero: string, pergunta: string, dono: string,
 ) {
+  const { nome: quem } = await exigirUsuario()
+
   // Dono é obrigatório e é uma pessoa. A tela também bloqueia, mas a regra
   // vive aqui: uma pendência sem dono é uma pergunta que ninguém respondeu.
   if (!pergunta.trim()) return { ok: false as const, motivo: 'A pergunta não pode ficar vazia.' }
@@ -31,8 +35,10 @@ export async function abrirPendencia(
 }
 
 export async function responderPendencia(
-  id: number, resposta: string, ehRegra: boolean, quem: string,
+  id: number, resposta: string, ehRegra: boolean,
 ) {
+  const { nome: quem } = await exigirUsuario()
+
   if (!resposta.trim()) return { ok: false as const, motivo: 'A resposta não pode ficar vazia.' }
 
   const [x] = await db.select().from(pendencias).where(eq(pendencias.id, id))

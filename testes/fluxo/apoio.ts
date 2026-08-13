@@ -1,5 +1,10 @@
 import { expect, type Page } from '@playwright/test'
 import postgres from 'postgres'
+import { gerarHash } from '@/dominio/senha'
+import {
+  USUARIO_DO_TESTE, SENHA_DO_TESTE, NOME_DO_TESTE, PAPEL_DO_TESTE,
+  OUTRO_USUARIO, OUTRO_NOME,
+} from './constantes'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
@@ -15,6 +20,44 @@ import os from 'node:os'
 
 /** CNPJ inválido por dígito verificador, como os do pacote de design. */
 export const CNPJ_DE_TESTE = '11222333000181'
+
+/**
+ * As pessoas que os testes usam.
+ *
+ * O hash é gerado pelo mesmo `gerarHash` da aplicação — não um hash colado no
+ * arquivo: colado, ele continuaria valendo depois de alguém trocar o algoritmo,
+ * e a suíte diria que o login funciona quando não funciona mais.
+ */
+export async function criarUsuariosDeTeste() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const hash = await gerarHash(SENHA_DO_TESTE)
+  for (const [usuario, nome] of [
+    [USUARIO_DO_TESTE, NOME_DO_TESTE], [OUTRO_USUARIO, OUTRO_NOME],
+  ]) {
+    await sql`
+      insert into usuarios (usuario, nome, papel, senha_hash, ativo)
+      values (${usuario}, ${nome}, ${PAPEL_DO_TESTE}, ${hash}, true)
+      on conflict (usuario) do update set
+        nome = excluded.nome, senha_hash = excluded.senha_hash, ativo = true`
+  }
+  await sql.end()
+}
+
+export async function desativarUsuario(usuario: string) {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  await sql`update usuarios set ativo = false where usuario = ${usuario}`
+  await sql.end()
+}
+
+/** Lê o histórico do pedido: é onde a assinatura de quem agiu tem de aparecer. */
+export async function lerHistorico(numero: string) {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const linhas = await sql`
+    select de, para, quem, motivo from historico_de_situacao
+    where numero_do_pedido = ${numero} order by id`
+  await sql.end()
+  return linhas
+}
 
 /** Devolve a base ao estado da carga: sem pedido de teste, sem cliente de teste. */
 export async function limparPedidosDeTeste() {

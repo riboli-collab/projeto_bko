@@ -3,6 +3,30 @@ import {
 } from 'drizzle-orm/pg-core'
 import type { Endereco, EnderecoDeEntrega } from '@/dominio/tipos'
 
+/**
+ * Quem pode entrar, e quem assina o que faz.
+ *
+ * `nome` é o que vai para `historico_de_situacao.quem`, `pendencias.aberta_por`
+ * e `anexos.anexado_por` — por texto, não por chave estrangeira, de propósito:
+ * o histórico registra quem era a pessoa **naquele dia**. Apagar o usuário não
+ * pode reescrever a prova de auditoria, e é isso que uma FK faria.
+ *
+ * `senhaHash` guarda scrypt com sal, nunca a senha. Ver `dominio/senha.ts`.
+ */
+export const usuarios = pgTable('usuarios', {
+  id: serial('id').primaryKey(),
+  /** Curto e sem espaço: é o que se digita no login. Único. */
+  usuario: text('usuario').notNull().unique(),
+  nome: text('nome').notNull(),
+  /** Etiqueta exibida no menu lateral. Ainda não restringe nada. */
+  papel: text('papel').notNull(),
+  senhaHash: text('senha_hash').notNull(),
+  /** Desativar em vez de apagar: o histórico continua apontando para o nome. */
+  ativo: boolean('ativo').notNull().default(true),
+  criadoEm: timestamp('criado_em', { withTimezone: true }).notNull().defaultNow(),
+  ultimoAcesso: timestamp('ultimo_acesso', { withTimezone: true }),
+})
+
 export const clientes = pgTable('clientes', {
   cnpjCpf: text('cnpj_cpf').primaryKey(),
   tipo: text('tipo').notNull(),                       // 'PF' | 'PJ'

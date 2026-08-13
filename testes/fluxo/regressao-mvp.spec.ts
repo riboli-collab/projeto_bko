@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import { abrirPeloNumero, limparPedidosDeTeste, preencherPedido } from './apoio'
+import { NOME_DO_TESTE } from './constantes'
 
 /**
  * A regressão do fluxo principal da Etapa A.
@@ -55,9 +56,11 @@ test('fluxo principal ponta a ponta: nasce, anda, aparece', async ({ page }) => 
   await expect(page.getByTestId('situacao-atual')).toHaveText('AGUARDANDO CONFECÇÃO DE CONTRATO')
   await expect(historico).toHaveCount(historicoAntes + 1)
   await expect(page.getByTestId('dias-parados')).toHaveText('0')
-  // Data e autor na linha nova: é isso que torna o checklist auditável.
+  // Data e autor na linha nova: é isso que torna o checklist auditável. O autor
+  // é a pessoa logada — antes esta linha aceitava qualquer um de cinco nomes
+  // fixos, porque nenhum deles tinha relação com quem estava usando o sistema.
   await expect(historico.first()).toContainText(/\d{2}\/\d{2}\/\d{4}/)
-  await expect(historico.first()).toContainText(/Raquel|Carlos|Gabrielle|Hiago|Tamara/)
+  await expect(historico.first()).toContainText(NOME_DO_TESTE)
   await page.screenshot({ path: 'evidencias/04-status-apos-transicao.png', fullPage: true })
 
   // 5. PERSISTE — sobrevive ao reload, porque está no Postgres

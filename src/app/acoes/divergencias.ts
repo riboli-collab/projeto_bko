@@ -3,11 +3,14 @@
 import { db } from '@/db/cliente'
 import { divergenciasDeCadastro } from '@/db/schema'
 import type { DivergenciaDeCadastro } from '@/dominio/divergencias'
+import { exigirUsuario } from './sessao'
 
+/** Quem registra sai da sessão, não da tela. Ver `mudarSituacao`. */
 export async function registrarDivergencias(
-  cnpjCpf: string, divergencias: DivergenciaDeCadastro[], quem: string,
+  cnpjCpf: string, divergencias: DivergenciaDeCadastro[],
 ) {
   if (divergencias.length === 0) return { ok: true as const, registradas: 0 }
+  const { nome: quem } = await exigirUsuario()
 
   await db.insert(divergenciasDeCadastro).values(
     divergencias.map((d) => ({

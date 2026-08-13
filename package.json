@@ -11,7 +11,8 @@
     "start": "next start",
     "carregar": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/carregar.ts",
     "verificar": "vitest run && playwright test",
-    "migrar": "node scripts/migrar.mjs"
+    "migrar": "node scripts/migrar.mjs",
+    "usuarios": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/usuarios.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
@@ -19,7 +20,8 @@
     "next": "16.3.0",
     "postgres": "^3.4.9",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
