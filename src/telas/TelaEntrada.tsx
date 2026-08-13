@@ -226,6 +226,21 @@ export function TelaEntrada({ opcoes }: { opcoes: { planos: CustoDoPlano[] } & R
         // O que o servidor respondeu vence o que a tela calculou: ele viu o banco.
         camposFaltantes={{ ...errosDeFormato, ...camposFaltantes }}
         bloqueioDePreco={preco?.tipo === 'bloqueado' ? preco.bloqueio : null}
+        // O pedido de exceção não existe: RN6 dá a decisão ao Supervisor, e o
+        // pedir e o aprovar nunca foram construídos. Sem este callback o
+        // componente chama `onSolicitarExcecao?.()` e o clique cai no vazio —
+        // quem escreve a justificativa e clica sai acreditando que pediu.
+        // Dizer que não foi enviado é pior de ouvir e melhor de saber.
+        onSolicitarExcecao={() => {
+          setErro(
+            'O pedido de exceção ainda não é feito pelo sistema: esta justificativa não foi enviada a ninguém. '
+            + 'Fale com o Supervisor. Enquanto o preço estiver abaixo do custo, o pedido não grava.',
+          )
+          // A faixa de erro fica no alto do formulário e os campos de preço, no
+          // meio dele. Sem trazer à vista, eu trocaria silêncio por uma mensagem
+          // que ninguém vê — que é o mesmo silêncio, com mais código.
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }}
         anexos={anexos}
         onAnexar={(documentoId, arquivo) => iniciar(async () => {
           const dados = new FormData()

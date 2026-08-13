@@ -31,6 +31,31 @@ test('preço abaixo do custo trava o envio, com os três números na tela', asyn
 })
 
 /**
+ * Pedir exceção não existe — e a tela diz isso, em vez de calar.
+ *
+ * `TravaDePreco` chama `onSolicitarExcecao?.()`. O `?.` é o problema: sem o
+ * callback, quem escreve a justificativa e clica não recebe resposta nenhuma e
+ * sai acreditando que pediu. O pedir e o aprovar da RN6 nunca foram
+ * construídos; enquanto não forem, o botão precisa devolver a verdade.
+ *
+ * Se um dia a exceção for construída de verdade, este teste falha — e é o
+ * lembrete certo de trocar a mensagem pelo comportamento.
+ */
+test('pedir exceção diz que não foi pedido a ninguém, em vez de não fazer nada', async ({ page }) => {
+  await page.goto('/pedidos/novo')
+  await preencherPedido(page, { operadora: 'Vivo', plano: 'ilimitado 6 GB', valor: '12.00' })
+
+  const painel = page.getByTestId('painel-de-preco')
+  await painel.getByRole('button', { name: /Pedir exceção ao Supervisor/i }).click()
+  await page.locator('#justificativa-excecao').fill('Cliente antigo em renegociação.')
+  await painel.getByRole('button', { name: /Pedir exceção ao Supervisor/i }).click()
+
+  await expect(page.getByText(/não foi enviada a ninguém/)).toBeVisible()
+  // E o preço continua travando: dizer a verdade não é liberar o envio.
+  await expect(page.getByRole('button', { name: 'Criar pedido' })).toBeDisabled()
+})
+
+/**
  * LACUNA DO PACOTE DE DESIGN, não do código.
  *
  * `BloqueioDePreco` não tem campo de procedência e `TravaDePreco` não tem onde

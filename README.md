@@ -204,9 +204,16 @@ histórico deixa de ser prova.
 
 **A exceção de preço, inteira.** A trava bloqueia a venda abaixo do custo, e o
 PRD dá ao Supervisor a decisão da exceção (RN6) — mas o pedir e o aprovar nunca
-foram construídos. As colunas existem em `pedidos`, o componente aceita
-`onSolicitarExcecao`, e ninguém liga os dois. Enquanto for assim, um preço
-abaixo do custo simplesmente não entra.
+foram construídos. As colunas existem em `pedidos` e ninguém as escreve.
+Enquanto for assim, um preço abaixo do custo simplesmente não entra.
+
+O botão continua na tela, porque ele mora em `src/design/` e essa cópia não se
+edita aqui. O que mudou é a resposta: `TelaEntrada` passa um
+`onSolicitarExcecao` que diz, na faixa de erro, que a justificativa **não foi
+enviada a ninguém**. Antes o componente chamava `onSolicitarExcecao?.()` sem
+callback e o clique caía no vazio — quem escrevia a justificativa saía
+acreditando que tinha pedido. A saída definitiva é desenhar o fluxo em
+`esteira-design/` e reexportar; até lá, dizer a verdade é o mínimo.
 
 **Recuperar senha esquecida sem passar por alguém.** Não há envio de e-mail:
 quem esquece pede um reset pela CLI e troca na entrada seguinte.
