@@ -32,7 +32,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     : await Promise.all([contarParaOShell(), usuarioAtual()])
 
   return (
-    <html lang="pt-BR">
+    // Extensões de navegador escrevem atributos no <html> antes de o React
+    // hidratar — a de assinatura digital põe `data-bry-content-script-*`, e o
+    // React acusa divergência entre servidor e cliente. Não é do app: aqui
+    // nada dinâmico é renderizado neste elemento (o modo escuro vem de
+    // `prefers-color-scheme`, não de classe), então o aviso só pode ser de
+    // fora. Suprimir cobre os atributos deste elemento e mais nada.
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className={`${inter.variable} ${mono.variable} bg-white dark:bg-slate-950`}>
         {contagens && usuario
           ? <Shell contagens={contagens} usuario={usuario}>{children}</Shell>

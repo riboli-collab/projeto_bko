@@ -58,6 +58,10 @@ rodam em série (`workers: 1`).
 dev server is already running", e a suíte inteira falha antes do primeiro teste.
 Nada a ver com a 3100 estar livre.
 
+E porta livre não quer dizer servidor parado: o `next-server` solta a escuta
+antes de sair, então o `lsof` já não acha nada enquanto o processo ainda segura
+a trava. Vá pelo PID que o próprio erro imprime.
+
 ## As três camadas
 
 | Pasta | Papel |
