@@ -33,7 +33,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `SEGREDO_DA_SESSAO='${SEGREDO_DO_TESTE}' npm run dev -- --port 3100`,
+    // Chama o `next` direto, sem passar por `npm run dev`: o script de
+    // desenvolvimento já fixa `--port 3300`, e encadear viraria
+    // `--port 3300 --port 3100`, com o resultado dependendo de qual das duas o
+    // parser escolhe. A suíte tem porta própria e não pode depender disso.
+    command: `SEGREDO_DA_SESSAO='${SEGREDO_DO_TESTE}' npx next dev --port 3100`,
     // Pela saúde, que é a única rota aberta: esperar por `/painel` daria 307
     // para `/entrar`, e o Playwright desistiria antes de o app subir.
     url: 'http://localhost:3100/saude',

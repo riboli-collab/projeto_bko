@@ -6,7 +6,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3300",
     "build": "next build",
     "start": "next start",
     "carregar": "tsx --env-file=.env.local --tsconfig tsconfig.json scripts/carregar.ts",

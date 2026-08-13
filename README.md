@@ -20,12 +20,24 @@ npm install
 npm run migrar                # cria as dez tabelas
 npm run carregar              # carrega clientes e planos de ../dados
 npm run usuarios criar voce "Seu Nome" BKO    # a senha aparece uma vez
-npm run dev                   # http://localhost:3000
+npm run dev                   # http://localhost:3300
 ```
 
 Sem usuário não se entra — nem local. É de propósito: um modo aberto que só
 existe na máquina de quem desenvolve é um modo que ninguém testa e que um dia
 vai para produção por engano.
+
+**A 3300 é a mesma porta do Design OS, e a colisão é silenciosa.** `esteira-design/`
+sobe um Vite ali. Com os dois no ar ninguém dá erro: o Vite prende `[::1]:3300`
+e o Next pega o curinga `*:3300`, e o kernel entrega ao *bind* mais específico.
+Resultado — `http://localhost:3300` abre o **Design OS**, e a Esteira só aparece
+em `http://127.0.0.1:3300`. Se a tela não for a que você espera, é isto. Derrube
+o servidor do design, ou suba a Esteira noutra porta:
+
+```bash
+lsof -nP -iTCP:3300 -sTCP:LISTEN    # quem está lá
+npm run dev -- --port 3000          # ou mova a Esteira
+```
 
 `npm run carregar` lê `../dados`, que **não faz parte deste repositório**: são
 CSVs com CPF, e-mail e telefone de clientes reais. Para subir só o catálogo de
@@ -40,6 +52,11 @@ npm run verificar             # 198 testes de unidade + 83 de fluxo
 Os testes de fluxo sobem o app na porta 3100 e rodam contra o Postgres de
 verdade — não há banco falso. Eles limpam e recriam os próprios dados, então
 rodam em série (`workers: 1`).
+
+**Pare o `npm run dev` antes de verificar.** O Next 16 recusa um segundo
+`next dev` no mesmo diretório *seja qual for a porta* — o erro é "Another next
+dev server is already running", e a suíte inteira falha antes do primeiro teste.
+Nada a ver com a 3100 estar livre.
 
 ## As três camadas
 
