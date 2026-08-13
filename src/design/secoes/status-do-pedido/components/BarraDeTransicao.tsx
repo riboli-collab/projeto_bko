@@ -223,7 +223,10 @@ export function BarraDeTransicao({
           </button>
 
           {menuAberto && (
-            <div className="absolute left-0 top-full z-20 mt-1 max-h-[28rem] w-96 max-w-[calc(100vw-3rem)] overflow-y-auto overscroll-contain rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+            <div
+              data-testid="menu-de-situacoes"
+              className="absolute left-0 top-full z-20 mt-1 max-h-[28rem] w-96 max-w-[calc(100vw-3rem)] overflow-y-auto overscroll-contain rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+            >
               <p
                 className={`${MICRO_ROTULO} sticky top-0 z-10 border-b border-slate-100 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900`}
               >

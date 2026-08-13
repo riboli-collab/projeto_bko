@@ -6,12 +6,15 @@ import { db } from '@/db/cliente'
 import { pedidos, pendencias } from '@/db/schema'
 import type { SituacaoId } from '@/dominio/tipos'
 import { exigirUsuario } from './sessao'
+import { podeMexerEmPendencia, papelDe } from '@/dominio/permissoes'
 
 /** Quem abre sai da sessão, não da tela. Ver `mudarSituacao`. */
 export async function abrirPendencia(
   numero: string, pergunta: string, dono: string,
 ) {
-  const { nome: quem } = await exigirUsuario()
+  const { nome: quem, papel } = await exigirUsuario()
+  const permissao = podeMexerEmPendencia(papelDe(papel))
+  if (!permissao.pode) return { ok: false as const, motivo: permissao.motivo! }
 
   // Dono é obrigatório e é uma pessoa. A tela também bloqueia, mas a regra
   // vive aqui: uma pendência sem dono é uma pergunta que ninguém respondeu.
@@ -37,7 +40,9 @@ export async function abrirPendencia(
 export async function responderPendencia(
   id: number, resposta: string, ehRegra: boolean,
 ) {
-  const { nome: quem } = await exigirUsuario()
+  const { nome: quem, papel } = await exigirUsuario()
+  const permissao = podeMexerEmPendencia(papelDe(papel))
+  if (!permissao.pode) return { ok: false as const, motivo: permissao.motivo! }
 
   if (!resposta.trim()) return { ok: false as const, motivo: 'A resposta não pode ficar vazia.' }
 

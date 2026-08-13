@@ -7,6 +7,7 @@ import { dataDoDesign, dataHoraDoDesign } from '@/dominio/datas'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
 import { calcularCobranca } from '@/dominio/cobranca'
 import { transicoesDisponiveis } from '@/dominio/maquina-de-estados'
+import { aplicarPapel, type Papel } from '@/dominio/permissoes'
 import type {
   SituacaoId, TipoDePedido, TipoDeChip, FormaDeEntrega, Operadora, EmpresaFaturadora,
 } from '@/dominio/tipos'
@@ -17,7 +18,13 @@ export const PESSOAS = [
   'Raquel', 'Tamara', 'Gabrielle Souza', 'Hiago Ferreira', 'Supervisor',
 ] as const
 
-export async function carregarPedido(numero: string) {
+/**
+ * `papel` entra como argumento, e não é buscado aqui dentro.
+ *
+ * Consulta não lê cookie: quem sabe quem está olhando é a página, que já
+ * resolveu a sessão. Assim esta função continua testável sem sessão nenhuma.
+ */
+export async function carregarPedido(numero: string, papel: Papel) {
   const [linha] = await db
     .select({ pedido: pedidos, cliente: clientes })
     .from(pedidos)
@@ -131,9 +138,16 @@ export async function carregarPedido(numero: string) {
     })),
     // A MESMA fonte que a ação de mudar situação usa. Se as duas divergirem, o
     // usuário clica num botão habilitado e leva recusa — por isso é uma só.
-    transicoes: transicoesDisponiveis({
-      atual: situacaoId, tipo, temComprovante: p.temComprovante, situacaoAnterior,
-    }),
+    //
+    // O papel entra por cima, e nunca libera o que o processo fechou: a regra
+    // do processo vem primeiro porque a mensagem dela é mais específica.
+    transicoes: aplicarPapel(
+      transicoesDisponiveis({
+        atual: situacaoId, tipo, temComprovante: p.temComprovante, situacaoAnterior,
+      }),
+      papel,
+      situacaoId,
+    ),
     pessoas: [...PESSOAS],
   }
 }

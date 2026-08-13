@@ -8,6 +8,7 @@ import { validarTransicao } from '@/dominio/maquina-de-estados'
 import { diasUteisEntre, estadoDoPrazo } from '@/dominio/relogio'
 import type { SituacaoId, TipoDePedido } from '@/dominio/tipos'
 import { exigirUsuario } from './sessao'
+import { podeMudarSituacao, papelDe } from '@/dominio/permissoes'
 
 /**
  * `quem` não é parâmetro: sai da sessão.
@@ -19,13 +20,22 @@ import { exigirUsuario } from './sessao'
 export async function mudarSituacao(
   numero: string, destino: SituacaoId, motivo: string,
 ) {
-  const { nome: quem } = await exigirUsuario()
+  const { nome: quem, papel } = await exigirUsuario()
 
   return await db.transaction(async (tx) => {
     const [p] = await tx.select().from(pedidos).where(eq(pedidos.numero, numero))
     if (!p) return { ok: false as const, motivo: 'Pedido não encontrado.' }
 
     const atual = p.situacaoId as SituacaoId
+
+    // O papel decide antes da máquina de estados: não adianta conferir se o
+    // processo permite a transição se esta pessoa não pode fazê-la de todo
+    // modo. E aqui é a autoridade — a tela desabilita o botão, mas botão
+    // desabilitado é decoração para quem chama a ação direto.
+    const permissao = podeMudarSituacao({
+      papel: papelDe(papel), de: atual, para: destino,
+    })
+    if (!permissao.pode) return { ok: false as const, motivo: permissao.motivo! }
 
     // De onde o pedido veio — é o que permite PARADO retomar de onde travou.
     const [ultima] = await tx

@@ -3,7 +3,7 @@ import postgres from 'postgres'
 import { gerarHash } from '@/dominio/senha'
 import {
   USUARIO_DO_TESTE, SENHA_DO_TESTE, NOME_DO_TESTE, PAPEL_DO_TESTE,
-  OUTRO_USUARIO, OUTRO_NOME,
+  OUTRO_USUARIO, OUTRO_NOME, OUTRO_PAPEL, USUARIO_COMERCIAL, NOME_COMERCIAL,
 } from './constantes'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -31,14 +31,18 @@ export const CNPJ_DE_TESTE = '11222333000181'
 export async function criarUsuariosDeTeste() {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
   const hash = await gerarHash(SENHA_DO_TESTE)
-  for (const [usuario, nome] of [
-    [USUARIO_DO_TESTE, NOME_DO_TESTE], [OUTRO_USUARIO, OUTRO_NOME],
-  ]) {
+  const pessoas: [string, string, string][] = [
+    [USUARIO_DO_TESTE, NOME_DO_TESTE, PAPEL_DO_TESTE],
+    [OUTRO_USUARIO, OUTRO_NOME, OUTRO_PAPEL],
+    [USUARIO_COMERCIAL, NOME_COMERCIAL, 'Comercial'],
+  ]
+  for (const [usuario, nome, papel] of pessoas) {
     await sql`
       insert into usuarios (usuario, nome, papel, senha_hash, ativo, precisa_trocar_senha)
-      values (${usuario}, ${nome}, ${PAPEL_DO_TESTE}, ${hash}, true, false)
+      values (${usuario}, ${nome}, ${papel}, ${hash}, true, false)
       on conflict (usuario) do update set
-        nome = excluded.nome, senha_hash = excluded.senha_hash, ativo = true,
+        nome = excluded.nome, papel = excluded.papel,
+        senha_hash = excluded.senha_hash, ativo = true,
         -- Já trocaram: os specs do fluxo testam o trabalho, não a estreia.
         -- Quem testa a estreia é troca-de-senha.spec.ts, que marca de volta.
         precisa_trocar_senha = false`

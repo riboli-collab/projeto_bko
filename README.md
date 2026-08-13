@@ -34,7 +34,7 @@ planos, que é dado de negócio, use `npx tsx scripts/carregar-planos.ts`.
 ## Como verificar
 
 ```bash
-npm run verificar             # 181 testes de unidade + 76 de fluxo
+npm run verificar             # 198 testes de unidade + 83 de fluxo
 ```
 
 Os testes de fluxo sobem o app na porta 3100 e rodam contra o Postgres de
@@ -96,7 +96,7 @@ tela de administração: são seis pessoas num escritório, e a gestão é por C
 
 ```bash
 npm run usuarios listar
-npm run usuarios criar hiago "Hiago Ferreira" BKO
+npm run usuarios criar hiago "Hiago Ferreira" BKO       # Comercial, BKO, Liderança ou Supervisão
 npm run usuarios senha hiago          # sorteia outra e mostra uma vez
 npm run usuarios senha hiago 123456   # ou define a que se quiser
 npm run usuarios desativar hiago      # tira o acesso, preserva o histórico
@@ -136,6 +136,40 @@ marca a conta para trocar, e a escrita para na ação seguinte.
 app subiu, e ele não digita senha: protegendo, todo deploy seria reprovado no
 healthcheck e revertido, com a aplicação funcionando.
 
+### O papel restringe, e a origem manda
+
+`src/dominio/permissoes.ts`. Camada separada da máquina de estados de propósito:
+uma responde "o processo permite ir daqui para ali?", a outra "**esta pessoa**
+pode?". A regra do processo não muda conforme quem olha.
+
+| Papel | Move o pedido | Também |
+|---|---|---|
+| `Comercial` | nada | abre pedido; fora de pendência |
+| `BKO` | situações 2 a 13 | pendências |
+| `Liderança` | tudo | conferência da entrada (1) e fechamento (14) são dela |
+| `Supervisão` | tudo | pendências |
+
+Quem manda é a situação de **origem** — é onde o pedido está agora, e portanto
+de quem é o trabalho. A única exceção é entrar em PEDIDO FINALIZADO: isso é
+lançar no Custos, e é da Liderança mesmo vindo de ENTREGUE.
+
+Vem da tabela de perfis do PRD (§2), com uma decisão que o PRD deixou em aberto
+— ele pergunta "quem cobre cada trilha em caso de ausência?" e não responde. A
+resposta escolhida foi **o BKO cobre o BKO**: Tamara, Gabrielle e Hiago
+compartilham a faixa e se substituem. A divisão Contrato/Execução continua
+valendo como combinado de equipe; ela só não é imposta pelo sistema, para a
+falta de uma pessoa não parar a esteira. Liderança e Supervisão passam por cima
+de qualquer faixa — são a válvula.
+
+Nada some da tela: a situação que o papel não alcança aparece com cadeado e o
+motivo escrito, no mesmo lugar onde a máquina de estados já explicava os
+bloqueios dela. Esconder faria quem não pode achar que o sistema quebrou, em vez
+de saber a quem pedir.
+
+`papelDe()` converte o texto do banco e cai em `Comercial` — o mais restrito —
+quando não reconhece. `papel` é `text` livre, e um dia alguém vai criar um
+usuário com "bko" minúsculo: um erro de digitação não pode virar mais poder.
+
 ### O autor nunca vem do navegador
 
 `src/app/acoes/sessao.ts` resolve quem está agindo a partir do cookie, no
@@ -147,9 +181,11 @@ histórico deixa de ser prova.
 
 ## O que ainda não existe
 
-**Papel que restringe alguma coisa.** `papel` é etiqueta no menu lateral e nada
-mais: quem entra pode fazer tudo o que a máquina de estados permite. Aprovar
-exceção de preço, por exemplo, devia ser do Supervisor e hoje é de qualquer um.
+**A exceção de preço, inteira.** A trava bloqueia a venda abaixo do custo, e o
+PRD dá ao Supervisor a decisão da exceção (RN6) — mas o pedir e o aprovar nunca
+foram construídos. As colunas existem em `pedidos`, o componente aceita
+`onSolicitarExcecao`, e ninguém liga os dois. Enquanto for assim, um preço
+abaixo do custo simplesmente não entra.
 
 **Recuperar senha esquecida sem passar por alguém.** Não há envio de e-mail:
 quem esquece pede um reset pela CLI e troca na entrada seguinte.
